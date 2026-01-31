@@ -6,7 +6,7 @@ import { Board } from '@/components/Board';
 import { useSession, signOut } from '@/lib/auth-client';
 import { LayoutDashboard, Calendar, Users, Settings, Search, Bell, Sparkles, LogOut, Loader2 } from 'lucide-react';
 import { useBoardStore } from '@/app/store';
-import { getBoardData } from '@/app/actions/board';
+import { getBoardData, ListWithCards } from '@/app/actions/board';
 
 export default function Home() {
   const router = useRouter();
@@ -27,7 +27,7 @@ export default function Home() {
           const data = await getBoardData();
           if (data) {
             // Map Prisma data to Store data structure
-            const mappedLists = data.map((list) => ({
+            const mappedLists = data.map((list: ListWithCards) => ({
               id: list.id,
               title: list.title,
               cards: list.cards.map((card) => ({

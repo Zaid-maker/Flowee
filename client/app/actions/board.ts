@@ -4,8 +4,13 @@ import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { Prisma } from "@prisma/client";
 
 const prisma = getPrisma();
+
+export type ListWithCards = Prisma.ListGetPayload<{
+    include: { cards: true };
+}>;
 
 async function getSession() {
     return await auth.api.getSession({
@@ -13,7 +18,7 @@ async function getSession() {
     });
 }
 
-export async function getBoardData() {
+export async function getBoardData(): Promise<ListWithCards[] | null> {
     const session = await getSession();
     if (!session) return null;
 
@@ -121,7 +126,7 @@ export async function deleteCard(cardId: string) {
     revalidatePath("/");
 }
 
-export async function updateCard(cardId: string, data: any) {
+export async function updateCard(cardId: string, data: Prisma.CardUpdateInput) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
