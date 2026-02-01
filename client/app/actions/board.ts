@@ -18,12 +18,66 @@ async function getSession() {
     });
 }
 
-export async function getBoardData(): Promise<ListWithCards[] | null> {
+export async function getBoards() {
     const session = await getSession();
     if (!session) return null;
 
-    let lists = await prisma.list.findMany({
+    return await prisma.board.findMany({
         where: { userId: session.user.id },
+        orderBy: { updatedAt: "desc" },
+    });
+}
+
+export async function createBoard(title: string) {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    const board = await prisma.board.create({
+        data: {
+            title,
+            userId: session.user.id,
+        },
+    });
+
+    // Seed default lists for the new board
+    const defaultLists = ["To-Do", "Doing", "Done"];
+    await Promise.all(
+        defaultLists.map((title, index) =>
+            prisma.list.create({
+                data: {
+                    title,
+                    userId: session.user.id,
+                    boardId: board.id,
+                    order: index,
+                },
+            })
+        )
+    );
+
+    revalidatePath("/");
+    return board;
+}
+
+export async function deleteBoard(id: string) {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    await prisma.board.delete({
+        where: { id, userId: session.user.id },
+    });
+
+    revalidatePath("/");
+}
+
+export async function getBoardData(boardId: string): Promise<ListWithCards[] | null> {
+    const session = await getSession();
+    if (!session) return null;
+
+    return await prisma.list.findMany({
+        where: {
+            userId: session.user.id,
+            boardId: boardId
+        },
         orderBy: { order: "asc" },
         include: {
             cards: {
@@ -31,49 +85,21 @@ export async function getBoardData(): Promise<ListWithCards[] | null> {
             },
         },
     });
-
-    // Seed default lists if empty
-    if (lists.length === 0) {
-        const defaultLists = ["To-Do", "Doing", "Done"];
-        await Promise.all(
-            defaultLists.map((title, index) =>
-                prisma.list.create({
-                    data: {
-                        title,
-                        userId: session.user.id,
-                        order: index,
-                    },
-                })
-            )
-        );
-
-        // Fetch again after seeding
-        lists = await prisma.list.findMany({
-            where: { userId: session.user.id },
-            orderBy: { order: "asc" },
-            include: {
-                cards: {
-                    orderBy: { order: "asc" },
-                },
-            },
-        });
-    }
-
-    return lists;
 }
 
-export async function createList(title: string) {
+export async function createList(boardId: string, title: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
     const listCount = await prisma.list.count({
-        where: { userId: session.user.id },
+        where: { boardId },
     });
 
     const list = await prisma.list.create({
         data: {
             title,
             userId: session.user.id,
+            boardId,
             order: listCount,
         },
     });
@@ -93,7 +119,7 @@ export async function deleteList(listId: string) {
     revalidatePath("/");
 }
 
-export async function createCard(listId: string, content: string, priority: "LOW" | "MEDIUM" | "HIGH" = "LOW") {
+export async function createCard(boardId: string, listId: string, content: string, priority: "LOW" | "MEDIUM" | "HIGH" = "LOW") {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
@@ -106,6 +132,7 @@ export async function createCard(listId: string, content: string, priority: "LOW
             content,
             priority,
             listId,
+            boardId,
             userId: session.user.id,
             order: cardCount,
         },
@@ -143,7 +170,6 @@ export async function moveCard(cardId: string, newListId: string, newOrder: numb
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
-    // This is a simplified version, ideally you'd handle reordering of other cards too
     const card = await prisma.card.update({
         where: { id: cardId, userId: session.user.id },
         data: {

@@ -12,7 +12,7 @@ export interface Subtask {
 export interface Card {
     id: string;
     content: string;
-    description?: string;
+    description: string | null;
     priority: Priority;
     deadline?: string;
     subtasks?: Subtask[];
@@ -24,10 +24,24 @@ export interface List {
     cards: Card[];
 }
 
+export interface Board {
+    id: string;
+    title: string;
+    description: string | null;
+    color: string | null;
+    background: string | null;
+}
+
 interface BoardStore {
+    boards: Board[];
     lists: List[];
     isLoaded: boolean;
+    activeBoardId: string | null;
     activeCardId: string | null;
+    setBoards: (boards: Board[]) => void;
+    addBoard: (title: string) => Promise<void>;
+    deleteBoard: (id: string) => Promise<void>;
+    selectBoard: (id: string | null) => void;
     openCardDetails: (cardId: string) => void;
     closeCardDetails: () => void;
     setLists: (lists: List[]) => void;
@@ -41,16 +55,45 @@ interface BoardStore {
 }
 
 export const useBoardStore = create<BoardStore>((set, get) => ({
+    boards: [],
     lists: [],
     isLoaded: false,
+    activeBoardId: null,
     activeCardId: null,
+
+    setBoards: (boards) => set({ boards }),
+
+    addBoard: async (title) => {
+        const newBoard = await actions.createBoard(title);
+        set((state) => ({
+            boards: [newBoard, ...state.boards],
+            activeBoardId: newBoard.id,
+            lists: [], // New board starts empty (server seeds defaults, but store needs reload or manual sync)
+        }));
+    },
+
+    deleteBoard: async (id) => {
+        await actions.deleteBoard(id);
+        const state = get();
+        set({
+            boards: state.boards.filter(b => b.id !== id),
+            activeBoardId: state.activeBoardId === id ? null : state.activeBoardId,
+            lists: state.activeBoardId === id ? [] : state.lists,
+        });
+    },
+
+    selectBoard: (id) => set({ activeBoardId: id, lists: [], isLoaded: false }),
+
     setLists: (lists) => set({ lists, isLoaded: true }),
 
     openCardDetails: (cardId) => set({ activeCardId: cardId }),
     closeCardDetails: () => set({ activeCardId: null }),
 
     addList: async (title) => {
-        const newList = await actions.createList(title);
+        const { activeBoardId } = get();
+        if (!activeBoardId) return;
+
+        const newList = await actions.createList(activeBoardId, title);
         set((state) => ({
             lists: [...state.lists, { id: newList.id, title: newList.title, cards: [] }],
         }));
@@ -64,8 +107,11 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     },
 
     addCard: async (listId, content, priority = 'low') => {
+        const { activeBoardId } = get();
+        if (!activeBoardId) return;
+
         const prismaPriority = priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH";
-        const newCard = await actions.createCard(listId, content, prismaPriority);
+        const newCard = await actions.createCard(activeBoardId, listId, content, prismaPriority);
         set((state) => ({
             lists: state.lists.map((l) =>
                 l.id === listId
@@ -73,7 +119,13 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
                         ...l,
                         cards: [
                             ...l.cards,
-                            { id: newCard.id, content: newCard.content, priority, subtasks: [] },
+                            {
+                                id: newCard.id,
+                                content: newCard.content,
+                                priority,
+                                description: null,
+                                subtasks: []
+                            },
                         ],
                     }
                     : l
