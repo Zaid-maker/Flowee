@@ -12,6 +12,7 @@ export interface Subtask {
 export interface Card {
     id: string;
     content: string;
+    description?: string;
     priority: Priority;
     deadline?: string;
     subtasks?: Subtask[];
@@ -26,6 +27,9 @@ export interface List {
 interface BoardStore {
     lists: List[];
     isLoaded: boolean;
+    activeCardId: string | null;
+    openCardDetails: (cardId: string) => void;
+    closeCardDetails: () => void;
     setLists: (lists: List[]) => void;
     addList: (title: string) => Promise<void>;
     deleteList: (listId: string) => Promise<void>;
@@ -39,7 +43,11 @@ interface BoardStore {
 export const useBoardStore = create<BoardStore>((set, get) => ({
     lists: [],
     isLoaded: false,
+    activeCardId: null,
     setLists: (lists) => set({ lists, isLoaded: true }),
+
+    openCardDetails: (cardId) => set({ activeCardId: cardId }),
+    closeCardDetails: () => set({ activeCardId: null }),
 
     addList: async (title) => {
         const newList = await actions.createList(title);

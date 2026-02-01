@@ -6,6 +6,7 @@ import { useBoardStore } from '../app/store';
 import { TaskColumn } from './TaskColumn';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, X } from 'lucide-react';
+import { CardDetailsModal } from './CardDetailsModal';
 
 export const Board: React.FC = () => {
     const { lists, moveCard, reorderCards, addList } = useBoardStore();
@@ -104,6 +105,8 @@ export const Board: React.FC = () => {
                     </div>
                 </motion.div>
             </DragDropContext>
+
+            <CardDetailsModal />
         </div>
     );
 };

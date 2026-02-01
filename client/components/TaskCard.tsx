@@ -22,6 +22,7 @@ const priorityColors = {
 
 export const TaskCard: React.FC<TaskCardProps> = ({ card, index, listId }) => {
     const deleteCard = useBoardStore((state) => state.deleteCard);
+    const openCardDetails = useBoardStore((state) => state.openCardDetails);
 
     return (
         <Draggable draggableId={card.id} index={index}>
@@ -33,8 +34,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({ card, index, listId }) => {
                         ref={provided.innerRef}
                         {...provided.draggableProps}
                         {...provided.dragHandleProps}
+                        onClick={() => openCardDetails(card.id)}
                         className={cn(
-                            'group relative mb-3 rounded-xl glass-card p-4 transition-all duration-200 hover:border-white/20 outline-none',
+                            'group relative mb-3 rounded-xl glass-card p-4 transition-all duration-200 hover:border-white/20 outline-none cursor-pointer',
                             snapshot.isDragging && 'z-[9999] scale-105 rotate-2 border-primary/50 shadow-primary/20 bg-zinc-800 pointer-events-none'
                         )}
                     >

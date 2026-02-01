@@ -33,6 +33,7 @@ export default function Home() {
               cards: list.cards.map((card) => ({
                 id: card.id,
                 content: card.content,
+                description: card.description || '',
                 priority: card.priority.toLowerCase() as any,
                 deadline: card.deadline?.toISOString(),
                 subtasks: (card.subtasks as any[]) || [],
