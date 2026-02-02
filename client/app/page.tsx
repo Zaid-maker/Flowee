@@ -123,9 +123,9 @@ export default function Home() {
       <aside className="flex w-20 flex-col items-center border-r border-white/5 bg-zinc-950/50 py-8 relative z-[20]">
         <div
           onClick={() => selectBoard(null)}
-          className="mb-12 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary shadow-lg shadow-primary/20 cursor-pointer hover:scale-105 transition-all"
+          className="mb-12 flex h-12 w-12 items-center justify-center rounded-2xl bg-zinc-900 border border-white/5 shadow-lg cursor-pointer hover:scale-105 transition-all overflow-hidden"
         >
-          <Sparkles className="h-6 w-6 text-white" />
+          <img src="/assets/logo.png" alt="Flowee Logo" className="h-full w-full object-cover p-2" />
         </div>
 
         <nav className="flex flex-col gap-8">
