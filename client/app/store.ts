@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import * as actions from './actions/board';
+import * as collabActions from './actions/collaboration';
 
 export type Priority = 'low' | 'medium' | 'high';
 
@@ -52,6 +53,15 @@ interface BoardStore {
     moveCard: (sourceListId: string, destListId: string, cardId: string, index: number) => Promise<void>;
     reorderCards: (listId: string, startIndex: number, endIndex: number) => Promise<void>;
     updateCard: (listId: string, cardId: string, updates: Partial<Card>) => Promise<void>;
+
+    // Collaboration
+    invites: any[];
+    activeBoardMembers: any[];
+    fetchInvites: () => Promise<void>;
+    acceptInvite: (inviteId: string) => Promise<void>;
+    declineInvite: (inviteId: string) => Promise<void>;
+    inviteUser: (email: string) => Promise<void>;
+    fetchBoardMembers: () => Promise<void>;
 }
 
 export const useBoardStore = create<BoardStore>((set, get) => ({
@@ -60,6 +70,8 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     isLoaded: false,
     activeBoardId: null,
     activeCardId: null,
+    invites: [],
+    activeBoardMembers: [],
 
     setBoards: (boards) => set({ boards }),
 
@@ -214,5 +226,37 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
                     : l
             ),
         }));
+    },
+
+    // Collaboration Actions
+    fetchInvites: async () => {
+        const invites = await collabActions.getPendingInvites();
+        set({ invites: invites || [] });
+    },
+
+    acceptInvite: async (inviteId) => {
+        await collabActions.acceptInvite(inviteId);
+        const { fetchInvites, setBoards } = get();
+        await fetchInvites();
+        const boards = await actions.getBoards();
+        if (boards) setBoards(boards);
+    },
+
+    declineInvite: async (inviteId) => {
+        await collabActions.declineInvite(inviteId);
+        get().fetchInvites();
+    },
+
+    inviteUser: async (email) => {
+        const { activeBoardId } = get();
+        if (!activeBoardId) return;
+        await collabActions.inviteUser(activeBoardId, email);
+    },
+
+    fetchBoardMembers: async () => {
+        const { activeBoardId } = get();
+        if (!activeBoardId) return;
+        const members = await collabActions.getBoardMembers(activeBoardId);
+        set({ activeBoardMembers: members || [] });
     },
 }));

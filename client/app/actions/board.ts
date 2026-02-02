@@ -23,7 +23,12 @@ export async function getBoards() {
     if (!session) return null;
 
     return await prisma.board.findMany({
-        where: { userId: session.user.id },
+        where: {
+            OR: [
+                { userId: session.user.id },
+                { members: { some: { userId: session.user.id } } }
+            ]
+        },
         orderBy: { updatedAt: "desc" },
     });
 }
@@ -69,13 +74,32 @@ export async function deleteBoard(id: string) {
     revalidatePath("/");
 }
 
+async function checkAccess(boardId: string, userId: string, ownerOnly = false) {
+    const board = await prisma.board.findUnique({
+        where: { id: boardId },
+        select: { userId: true },
+    });
+
+    if (!board) return false;
+    if (board.userId === userId) return true;
+    if (ownerOnly) return false;
+
+    const membership = await prisma.boardMember.findFirst({
+        where: { boardId, userId },
+    });
+
+    return !!membership;
+}
+
 export async function getBoardData(boardId: string): Promise<ListWithCards[] | null> {
     const session = await getSession();
     if (!session) return null;
 
+    const hasAccess = await checkAccess(boardId, session.user.id);
+    if (!hasAccess) return null;
+
     return await prisma.list.findMany({
         where: {
-            userId: session.user.id,
             boardId: boardId
         },
         orderBy: { order: "asc" },
@@ -90,6 +114,9 @@ export async function getBoardData(boardId: string): Promise<ListWithCards[] | n
 export async function createList(boardId: string, title: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
+
+    const hasAccess = await checkAccess(boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
 
     const listCount = await prisma.list.count({
         where: { boardId },
@@ -112,8 +139,18 @@ export async function deleteList(listId: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
+    const list = await prisma.list.findUnique({
+        where: { id: listId },
+        select: { boardId: true },
+    });
+
+    if (!list) throw new Error("List not found");
+
+    const hasAccess = await checkAccess(list.boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
+
     await prisma.list.delete({
-        where: { id: listId, userId: session.user.id },
+        where: { id: listId },
     });
 
     revalidatePath("/");
@@ -122,6 +159,9 @@ export async function deleteList(listId: string) {
 export async function createCard(boardId: string, listId: string, content: string, priority: "LOW" | "MEDIUM" | "HIGH" = "LOW") {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
+
+    const hasAccess = await checkAccess(boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
 
     const cardCount = await prisma.card.count({
         where: { listId },
@@ -146,8 +186,18 @@ export async function deleteCard(cardId: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
+    const card = await prisma.card.findUnique({
+        where: { id: cardId },
+        select: { boardId: true },
+    });
+
+    if (!card) throw new Error("Card not found");
+
+    const hasAccess = await checkAccess(card.boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
+
     await prisma.card.delete({
-        where: { id: cardId, userId: session.user.id },
+        where: { id: cardId },
     });
 
     revalidatePath("/");
@@ -157,8 +207,18 @@ export async function updateCard(cardId: string, data: Prisma.CardUpdateInput) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
+    const cardRecord = await prisma.card.findUnique({
+        where: { id: cardId },
+        select: { boardId: true },
+    });
+
+    if (!cardRecord) throw new Error("Card not found");
+
+    const hasAccess = await checkAccess(cardRecord.boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
+
     const card = await prisma.card.update({
-        where: { id: cardId, userId: session.user.id },
+        where: { id: cardId },
         data,
     });
 
@@ -186,11 +246,21 @@ export async function reorderCards(listId: string, cardIds: string[]) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
+    const list = await prisma.list.findUnique({
+        where: { id: listId },
+        select: { boardId: true },
+    });
+
+    if (!list) throw new Error("List not found");
+
+    const hasAccess = await checkAccess(list.boardId, session.user.id);
+    if (!hasAccess) throw new Error("Forbidden");
+
     // Batch update orders
     await Promise.all(
         cardIds.map((id, index) =>
             prisma.card.update({
-                where: { id, userId: session.user.id },
+                where: { id },
                 data: { order: index },
             })
         )

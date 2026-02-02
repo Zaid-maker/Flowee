@@ -11,19 +11,21 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
+  id            String            @id @default(cuid())
   name          String?
-  email         String    @unique
-  emailVerified Boolean   @default(false)
+  email         String            @unique
+  emailVerified Boolean           @default(false)
   image         String?
   displayName   String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
   sessions      Session[]
   accounts      Account[]
   lists         List[]
   cards         Card[]
   boards        Board[]
+  memberships   BoardMember[]
+  invitations   BoardInvitation[]
 }
 
 model Session {
@@ -65,23 +67,64 @@ model Verification {
 }
 
 model Board {
-  id          String   @id @default(cuid())
+  id          String            @id @default(cuid())
   title       String
   description String?
-  color       String?  @default("#3b82f6")
+  color       String?           @default("#3b82f6")
   background  String?
   userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   lists       List[]
   cards       Card[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  members     BoardMember[]
+  invites     BoardInvitation[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 }
 
 enum Priority {
   LOW
   MEDIUM
   HIGH
+}
+
+enum BoardRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+model BoardMember {
+  id   String    @id @default(cuid())
+  role BoardRole @default(MEMBER)
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, boardId])
+}
+
+model BoardInvitation {
+  id        String    @id @default(cuid())
+  email     String
+  role      BoardRole @default(MEMBER)
+  token     String    @unique
+  expiresAt DateTime
+
+  boardId String
+  board   Board  @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  inviterId String
+  inviter   User   @relation(fields: [inviterId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 model List {

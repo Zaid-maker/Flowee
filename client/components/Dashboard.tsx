@@ -11,6 +11,9 @@ import {
     ChevronRight,
     Search,
     Filter,
+    Bell,
+    Check,
+    X as Close,
     Sparkles
 } from 'lucide-react';
 import { useBoardStore, Board } from '@/app/store';
@@ -18,7 +21,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
-    const { boards, addBoard, deleteBoard, selectBoard } = useBoardStore();
+    const { boards, addBoard, deleteBoard, selectBoard, invites, acceptInvite, declineInvite } = useBoardStore();
     const [isCreating, setIsCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
 
@@ -57,6 +60,62 @@ export const Dashboard: React.FC = () => {
                         </button>
                     </div>
                 </header>
+
+                {/* Invitations Section */}
+                <AnimatePresence>
+                    {invites.length > 0 && (
+                        <motion.section
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: 'auto' }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="space-y-4"
+                        >
+                            <div className="flex items-center gap-2 text-primary font-bold tracking-tighter text-xs uppercase">
+                                <Bell className="h-3 w-3" />
+                                <span>Pending Invitations ({invites.length})</span>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {invites.map((invite) => (
+                                    <motion.div
+                                        key={invite.id}
+                                        layout
+                                        className="p-4 rounded-2xl bg-primary/5 border border-primary/20 flex items-center justify-between gap-4"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center text-primary">
+                                                <Layout className="h-5 w-5" />
+                                            </div>
+                                            <div>
+                                                <h4 className="text-sm font-bold text-white">
+                                                    Invite to <span className="text-primary italic">"{invite.board.title}"</span>
+                                                </h4>
+                                                <p className="text-[11px] text-zinc-500">
+                                                    From {invite.inviter.name || invite.inviter.email}
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => declineInvite(invite.id)}
+                                                className="p-2 rounded-xl text-zinc-500 hover:text-rose-500 hover:bg-rose-500/10 transition-all"
+                                                title="Decline"
+                                            >
+                                                <Close className="h-4 w-4" />
+                                            </button>
+                                            <button
+                                                onClick={() => acceptInvite(invite.id)}
+                                                className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20 flex items-center gap-2"
+                                            >
+                                                <Check className="h-3 w-3" />
+                                                Accept
+                                            </button>
+                                        </div>
+                                    </motion.div>
+                                ))}
+                            </div>
+                        </motion.section>
+                    )}
+                </AnimatePresence>
 
                 {/* Boards Grid */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">

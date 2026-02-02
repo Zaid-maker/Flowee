@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Board } from '@/components/Board';
 import { Dashboard } from '@/components/Dashboard';
+import { InviteModal } from '@/components/InviteModal';
 import { useSession, signOut } from '@/lib/auth-client';
 import {
   LayoutDashboard,
@@ -30,8 +31,13 @@ export default function Home() {
     activeBoardId,
     selectBoard,
     setLists,
-    isLoaded
+    isLoaded,
+    activeBoardMembers,
+    fetchInvites,
+    fetchBoardMembers
   } = useBoardStore();
+
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const [isInitializing, setIsInitializing] = useState(true);
   const [isFetchingBoard, setIsFetchingBoard] = useState(false);
@@ -59,8 +65,11 @@ export default function Home() {
         }
       }
     }
-    if (session) initWorkspace();
-  }, [session, setBoards]);
+    if (session) {
+      initWorkspace();
+      fetchInvites();
+    }
+  }, [session, setBoards, fetchInvites]);
 
   // Board Data Switcher
   useEffect(() => {
@@ -91,8 +100,11 @@ export default function Home() {
         }
       }
     }
-    fetchActiveBoard();
-  }, [session, activeBoardId, isLoaded, setLists]);
+    if (activeBoardId) {
+      fetchActiveBoard();
+      fetchBoardMembers();
+    }
+  }, [session, activeBoardId, isLoaded, setLists, fetchBoardMembers]);
 
   const handleLogout = async () => {
     await signOut();
@@ -200,7 +212,30 @@ export default function Home() {
               <Bell className="h-5 w-5" />
               <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 border-2 border-zinc-950" />
             </button>
-            <button className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95">
+            <div className="flex -space-x-2 mr-2">
+              {activeBoardMembers.slice(0, 3).map((member) => (
+                <div
+                  key={member.id}
+                  className="h-8 w-8 rounded-lg border-2 border-zinc-950 overflow-hidden bg-zinc-800"
+                  title={member.user.name || member.user.email}
+                >
+                  <img
+                    src={member.user.image || `https://api.dicebear.com/7.x/avataaars/svg?seed=${member.user.email}`}
+                    alt="Member"
+                  />
+                </div>
+              ))}
+              {activeBoardMembers.length > 3 && (
+                <div className="h-8 w-8 rounded-lg border-2 border-zinc-950 bg-zinc-900 flex items-center justify-center text-[10px] font-bold text-zinc-400">
+                  +{activeBoardMembers.length - 3}
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => setIsInviteOpen(true)}
+              className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+            >
               Share
             </button>
           </div>
@@ -221,6 +256,11 @@ export default function Home() {
             <Dashboard />
           )}
         </div>
+
+        <InviteModal
+          isOpen={isInviteOpen}
+          onClose={() => setIsInviteOpen(false)}
+        />
 
         {/* Background Decor */}
         <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-primary/5 blur-[120px] rounded-full -translate-y-1/2 translate-x-1/2 pointer-events-none" />
