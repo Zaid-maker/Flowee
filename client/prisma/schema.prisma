@@ -25,7 +25,8 @@ model User {
   cards         Card[]
   boards        Board[]
   memberships   BoardMember[]
-  invitations   BoardInvitation[]
+  invites       BoardInvitation[]
+  notifications Notification[]
 }
 
 model Session {
@@ -156,4 +157,17 @@ model Card {
   subtasks    Json? // Array of { content: string, completed: boolean }
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      String // e.g., "BOARD_INVITATION", "BOARD_UPDATE"
+  title     String
+  message   String
+  link      String? // Optional link to redirect the user
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

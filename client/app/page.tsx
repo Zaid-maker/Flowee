@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation';
 import { Board } from '@/components/Board';
 import { Dashboard } from '@/components/Dashboard';
 import { InviteModal } from '@/components/InviteModal';
+import { NotificationCenter } from '@/components/NotificationCenter';
+
 import { useSession, signOut } from '@/lib/auth-client';
 import {
   LayoutDashboard,
@@ -208,10 +210,8 @@ export default function Home() {
                 className="h-10 rounded-xl border border-white/5 bg-white/5 pl-10 pr-4 text-sm text-zinc-200 outline-none transition-all focus:border-primary/50 focus:bg-white/10 w-64"
               />
             </div>
-            <button className="relative rounded-xl border border-white/5 bg-white/5 p-2.5 text-zinc-400 hover:text-white transition-colors">
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-rose-500 border-2 border-zinc-950" />
-            </button>
+            <NotificationCenter />
+
             <div className="flex -space-x-2 mr-2">
               {activeBoardMembers.slice(0, 3).map((member) => (
                 <div

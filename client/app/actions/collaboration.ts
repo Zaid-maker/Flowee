@@ -54,9 +54,32 @@ export async function inviteUser(boardId: string, email: string) {
         },
     });
 
+    // Check if user exists and create a notification
+    const invitedUser = await prisma.user.findUnique({
+        where: { email },
+    });
+
+    if (invitedUser) {
+        const boardInfo = await prisma.board.findUnique({
+            where: { id: boardId },
+            select: { title: true },
+        });
+
+        await prisma.notification.create({
+            data: {
+                userId: invitedUser.id,
+                type: "BOARD_INVITATION",
+                title: "New Board Invitation",
+                message: `${session.user.name || session.user.email} invited you to join "${boardInfo?.title}"`,
+                link: `/`, // On the dashboard they'll see the invite
+            },
+        });
+    }
+
     revalidatePath("/");
     return invitation;
 }
+
 
 export async function getPendingInvites() {
     const session = await getSession();

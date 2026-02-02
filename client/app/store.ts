@@ -33,6 +33,23 @@ export interface Board {
     background: string | null;
 }
 
+export interface Notification {
+    id: string;
+    type: string;
+    title: string;
+    message: string;
+    link?: string | null;
+    isRead: boolean;
+    createdAt: Date;
+}
+
+export interface Toast {
+    id: string;
+    message: string;
+    type: 'success' | 'error' | 'info' | 'warning';
+}
+
+
 interface BoardStore {
     boards: Board[];
     lists: List[];
@@ -62,7 +79,20 @@ interface BoardStore {
     declineInvite: (inviteId: string) => Promise<void>;
     inviteUser: (email: string) => Promise<void>;
     fetchBoardMembers: () => Promise<void>;
+
+    // Notifications
+    notifications: Notification[];
+    fetchNotifications: () => Promise<void>;
+    markNotificationAsRead: (id: string) => Promise<void>;
+    markAllNotificationsAsRead: () => Promise<void>;
+    deleteNotification: (id: string) => Promise<void>;
+
+    // Toasts
+    toasts: Toast[];
+    addToast: (message: string, type?: Toast['type']) => void;
+    removeToast: (id: string) => void;
 }
+
 
 export const useBoardStore = create<BoardStore>((set, get) => ({
     boards: [],
@@ -72,6 +102,8 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     activeCardId: null,
     invites: [],
     activeBoardMembers: [],
+    notifications: [],
+    toasts: [],
 
     setBoards: (boards) => set({ boards }),
 
@@ -80,11 +112,14 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         set((state) => ({
             boards: [newBoard, ...state.boards],
             activeBoardId: newBoard.id,
-            lists: [], // New board starts empty (server seeds defaults, but store needs reload or manual sync)
+            lists: [],
         }));
+        get().addToast(`Board "${title}" created successfully!`, 'success');
     },
 
+
     deleteBoard: async (id) => {
+        const board = get().boards.find(b => b.id === id);
         await actions.deleteBoard(id);
         const state = get();
         set({
@@ -92,6 +127,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             activeBoardId: state.activeBoardId === id ? null : state.activeBoardId,
             lists: state.activeBoardId === id ? [] : state.lists,
         });
+        get().addToast(`Board "${board?.title}" deleted.`, 'info');
     },
 
     selectBoard: (id) => set({ activeBoardId: id, lists: [], isLoaded: false }),
@@ -109,13 +145,16 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         set((state) => ({
             lists: [...state.lists, { id: newList.id, title: newList.title, cards: [] }],
         }));
+        get().addToast(`List "${title}" added.`, 'success');
     },
 
     deleteList: async (listId) => {
+        const list = get().lists.find(l => l.id === listId);
         await actions.deleteList(listId);
         set((state) => ({
             lists: state.lists.filter((l) => l.id !== listId),
         }));
+        get().addToast(`List "${list?.title}" removed.`, 'info');
     },
 
     addCard: async (listId, content, priority = 'low') => {
@@ -143,6 +182,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
                     : l
             ),
         }));
+        get().addToast('Card added to list.', 'success');
     },
 
     deleteCard: async (listId, cardId) => {
@@ -152,6 +192,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
                 l.id === listId ? { ...l, cards: l.cards.filter((c) => c.id !== cardId) } : l
             ),
         }));
+        get().addToast('Card deleted.', 'info');
     },
 
     moveCard: async (sourceListId, destListId, cardId, index) => {
@@ -236,21 +277,29 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
 
     acceptInvite: async (inviteId) => {
         await collabActions.acceptInvite(inviteId);
-        const { fetchInvites, setBoards } = get();
+        const { fetchInvites, setBoards, addToast } = get();
         await fetchInvites();
         const boards = await actions.getBoards();
         if (boards) setBoards(boards);
+        addToast("Invitation accepted!", "success");
     },
 
     declineInvite: async (inviteId) => {
         await collabActions.declineInvite(inviteId);
         get().fetchInvites();
+        get().addToast("Invitation declined.", "info");
     },
+
 
     inviteUser: async (email) => {
         const { activeBoardId } = get();
         if (!activeBoardId) return;
-        await collabActions.inviteUser(activeBoardId, email);
+        try {
+            await collabActions.inviteUser(activeBoardId, email);
+            get().addToast(`Invitation sent to ${email}`, 'success');
+        } catch (error: any) {
+            get().addToast(error.message || "Failed to send invitation", 'error');
+        }
     },
 
     fetchBoardMembers: async () => {
@@ -259,4 +308,65 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         const members = await collabActions.getBoardMembers(activeBoardId);
         set({ activeBoardMembers: members || [] });
     },
+
+    // Notifications Actions
+    fetchNotifications: async () => {
+        const { getNotifications } = await import("./actions/notification");
+        const notifications = await getNotifications();
+        // Convert string dates to Date objects if necessary
+        const mappedNotifications = notifications.map(n => ({
+            ...n,
+            createdAt: new Date(n.createdAt),
+        }));
+        set({ notifications: mappedNotifications });
+    },
+
+    markNotificationAsRead: async (id) => {
+        const { markAsRead } = await import("./actions/notification");
+        await markAsRead(id);
+        const { notifications } = get();
+        set({
+            notifications: notifications.map(n =>
+                n.id === id ? { ...n, isRead: true } : n
+            )
+        });
+    },
+
+    markAllNotificationsAsRead: async () => {
+        const { markAllAsRead } = await import("./actions/notification");
+        await markAllAsRead();
+        const { notifications } = get();
+        set({
+            notifications: notifications.map(n => ({ ...n, isRead: true }))
+        });
+    },
+
+    deleteNotification: async (id) => {
+        const { deleteNotification } = await import("./actions/notification");
+        await deleteNotification(id);
+        const { notifications } = get();
+        set({
+            notifications: notifications.filter(n => n.id !== id)
+        });
+    },
+
+    // Toast Actions
+    addToast: (message, type = 'info') => {
+        const id = Math.random().toString(36).substring(7);
+        set((state) => ({
+            toasts: [...state.toasts, { id, message, type }]
+        }));
+
+        // Auto remove toast after 3 seconds
+        setTimeout(() => {
+            get().removeToast(id);
+        }, 3000);
+    },
+
+    removeToast: (id) => {
+        set((state) => ({
+            toasts: state.toasts.filter((t) => t.id !== id)
+        }));
+    },
 }));
+
