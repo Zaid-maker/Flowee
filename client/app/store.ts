@@ -31,6 +31,7 @@ export interface Board {
     description: string | null;
     color: string | null;
     background: string | null;
+    userId: string;
 }
 
 export interface Notification {
