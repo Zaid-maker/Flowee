@@ -12,7 +12,10 @@ interface InviteModalProps {
 }
 
 export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose }) => {
-    const { activeBoardMembers, fetchBoardMembers, inviteUser, activeBoardId } = useBoardStore();
+    const activeBoardMembers = useBoardStore(state => state.activeBoardMembers);
+    const fetchBoardMembers = useBoardStore(state => state.fetchBoardMembers);
+    const inviteUser = useBoardStore(state => state.inviteUser);
+    const activeBoardId = useBoardStore(state => state.activeBoardId);
     const [email, setEmail] = useState('');
     const [isInviting, setIsInviting] = useState(false);
     const [inviteSent, setInviteSent] = useState(false);

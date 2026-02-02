@@ -27,20 +27,20 @@ import { getBoardData, getBoards, ListWithCards } from '@/app/actions/board';
 export default function Home() {
   const router = useRouter();
   const { data: session, isPending } = useSession();
-  const {
-    boards,
-    setBoards,
-    activeBoardId,
-    selectBoard,
-    setLists,
-    isLoaded,
-    activeBoardMembers,
-    fetchInvites,
-    fetchBoardMembers
-  } = useBoardStore();
+  const userId = session?.user?.id;
+
+  const boards = useBoardStore(state => state.boards);
+  const activeBoardId = useBoardStore(state => state.activeBoardId);
+  const isLoaded = useBoardStore(state => state.isLoaded);
+  const activeBoardMembers = useBoardStore(state => state.activeBoardMembers);
+
+  const setBoards = useBoardStore(state => state.setBoards);
+  const selectBoard = useBoardStore(state => state.selectBoard);
+  const setLists = useBoardStore(state => state.setLists);
+  const fetchInvites = useBoardStore(state => state.fetchInvites);
+  const fetchBoardMembers = useBoardStore(state => state.fetchBoardMembers);
 
   const [isInviteOpen, setIsInviteOpen] = useState(false);
-
   const [isInitializing, setIsInitializing] = useState(true);
   const [isFetchingBoard, setIsFetchingBoard] = useState(false);
 
@@ -54,7 +54,7 @@ export default function Home() {
   // Initial Fetch: Load all boards
   useEffect(() => {
     async function initWorkspace() {
-      if (session?.user) {
+      if (userId) {
         try {
           const allBoards = await getBoards();
           if (allBoards) {
@@ -67,16 +67,16 @@ export default function Home() {
         }
       }
     }
-    if (session) {
+    if (userId) {
       initWorkspace();
       fetchInvites();
     }
-  }, [session, setBoards, fetchInvites]);
+  }, [userId, setBoards, fetchInvites]);
 
   // Board Data Switcher
   useEffect(() => {
     async function fetchActiveBoard() {
-      if (session?.user && activeBoardId && !isLoaded) {
+      if (userId && activeBoardId && !isLoaded) {
         setIsFetchingBoard(true);
         try {
           const data = await getBoardData(activeBoardId);
@@ -106,7 +106,7 @@ export default function Home() {
       fetchActiveBoard();
       fetchBoardMembers();
     }
-  }, [session, activeBoardId, isLoaded, setLists, fetchBoardMembers]);
+  }, [userId, activeBoardId, isLoaded, setLists, fetchBoardMembers]);
 
   const handleLogout = async () => {
     await signOut();

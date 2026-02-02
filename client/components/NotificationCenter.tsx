@@ -6,13 +6,11 @@ import { Bell, X, Check, Trash2, ExternalLink, Inbox } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 export const NotificationCenter = () => {
-    const {
-        notifications,
-        fetchNotifications,
-        markNotificationAsRead,
-        markAllNotificationsAsRead,
-        deleteNotification
-    } = useBoardStore();
+    const notifications = useBoardStore(state => state.notifications);
+    const fetchNotifications = useBoardStore(state => state.fetchNotifications);
+    const markNotificationAsRead = useBoardStore(state => state.markNotificationAsRead);
+    const markAllNotificationsAsRead = useBoardStore(state => state.markAllNotificationsAsRead);
+    const deleteNotification = useBoardStore(state => state.deleteNotification);
 
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);

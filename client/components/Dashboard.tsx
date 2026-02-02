@@ -21,7 +21,13 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
-    const { boards, addBoard, deleteBoard, selectBoard, invites, acceptInvite, declineInvite } = useBoardStore();
+    const boards = useBoardStore(state => state.boards);
+    const invites = useBoardStore(state => state.invites);
+    const addBoard = useBoardStore(state => state.addBoard);
+    const deleteBoard = useBoardStore(state => state.deleteBoard);
+    const selectBoard = useBoardStore(state => state.selectBoard);
+    const acceptInvite = useBoardStore(state => state.acceptInvite);
+    const declineInvite = useBoardStore(state => state.declineInvite);
     const [isCreating, setIsCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
 

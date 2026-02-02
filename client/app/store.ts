@@ -74,6 +74,8 @@ interface BoardStore {
     // Collaboration
     invites: any[];
     activeBoardMembers: any[];
+    isFetchingInvites: boolean;
+    isFetchingMembers: boolean;
     fetchInvites: () => Promise<void>;
     acceptInvite: (inviteId: string) => Promise<void>;
     declineInvite: (inviteId: string) => Promise<void>;
@@ -82,6 +84,7 @@ interface BoardStore {
 
     // Notifications
     notifications: Notification[];
+    isFetchingNotifications: boolean;
     fetchNotifications: () => Promise<void>;
     markNotificationAsRead: (id: string) => Promise<void>;
     markAllNotificationsAsRead: () => Promise<void>;
@@ -102,7 +105,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     activeCardId: null,
     invites: [],
     activeBoardMembers: [],
+    isFetchingInvites: false,
+    isFetchingMembers: false,
     notifications: [],
+    isFetchingNotifications: false,
     toasts: [],
 
     setBoards: (boards) => set({ boards }),
@@ -271,8 +277,14 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
 
     // Collaboration Actions
     fetchInvites: async () => {
-        const invites = await collabActions.getPendingInvites();
-        set({ invites: invites || [] });
+        if (get().isFetchingInvites) return;
+        set({ isFetchingInvites: true });
+        try {
+            const invites = await collabActions.getPendingInvites();
+            set({ invites: invites || [] });
+        } finally {
+            set({ isFetchingInvites: false });
+        }
     },
 
     acceptInvite: async (inviteId) => {
@@ -303,22 +315,35 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     },
 
     fetchBoardMembers: async () => {
-        const { activeBoardId } = get();
-        if (!activeBoardId) return;
-        const members = await collabActions.getBoardMembers(activeBoardId);
-        set({ activeBoardMembers: members || [] });
+        const { activeBoardId, isFetchingMembers } = get();
+        if (!activeBoardId || isFetchingMembers) return;
+
+        set({ isFetchingMembers: true });
+        try {
+            const members = await collabActions.getBoardMembers(activeBoardId);
+            set({ activeBoardMembers: members || [] });
+        } finally {
+            set({ isFetchingMembers: false });
+        }
     },
 
     // Notifications Actions
     fetchNotifications: async () => {
-        const { getNotifications } = await import("./actions/notification");
-        const notifications = await getNotifications();
-        // Convert string dates to Date objects if necessary
-        const mappedNotifications = notifications.map(n => ({
-            ...n,
-            createdAt: new Date(n.createdAt),
-        }));
-        set({ notifications: mappedNotifications });
+        if (get().isFetchingNotifications) return;
+
+        set({ isFetchingNotifications: true });
+        try {
+            const { getNotifications } = await import("./actions/notification");
+            const notifications = await getNotifications();
+            // Convert string dates to Date objects if necessary
+            const mappedNotifications = notifications.map(n => ({
+                ...n,
+                createdAt: new Date(n.createdAt),
+            }));
+            set({ notifications: mappedNotifications });
+        } finally {
+            set({ isFetchingNotifications: false });
+        }
     },
 
     markNotificationAsRead: async (id) => {
