@@ -1,10 +1,9 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Plus,
-    MoreVertical,
     Trash2,
     Layout,
     Clock,
@@ -19,7 +18,6 @@ import {
 import { useBoardStore, Board } from '@/app/store';
 import { useSession } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 
 export const Dashboard: React.FC = () => {
     const { data: session } = useSession();
@@ -34,139 +32,149 @@ export const Dashboard: React.FC = () => {
     const [isCreating, setIsCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
 
-    const ownedBoards = boards.filter(b => b.userId === session?.user?.id);
-    const sharedBoards = boards.filter(b => b.userId !== session?.user?.id);
+    // Memoize board filtering
+    const { ownedBoards, sharedBoards } = useMemo(() => {
+        const userId = session?.user?.id;
+        return {
+            ownedBoards: boards.filter(b => b.userId === userId),
+            sharedBoards: boards.filter(b => b.userId !== userId)
+        };
+    }, [boards, session?.user?.id]);
 
-    const handleCreate = async (e: React.FormEvent) => {
+    const handleCreate = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTitle.trim()) return;
         await addBoard(newTitle.trim());
         setNewTitle('');
         setIsCreating(false);
-    };
+    }, [addBoard, newTitle]);
 
-    const renderBoardGrid = (boardsToRender: Board[], showCreate = false) => (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-            {showCreate && (
-                <AnimatePresence mode="wait">
-                    {isCreating ? (
-                        <motion.form
-                            key="create-form"
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            onSubmit={handleCreate}
-                            className="relative h-48 rounded-3xl border border-primary/30 bg-primary/5 p-6 flex flex-col justify-between overflow-hidden group shadow-2xl shadow-primary/10"
-                        >
-                            <div className="space-y-4 relative z-10">
-                                <span className="text-[10px] font-bold text-primary uppercase tracking-widest">New Project</span>
-                                <input
-                                    autoFocus
-                                    value={newTitle}
-                                    onChange={(e) => setNewTitle(e.target.value)}
-                                    placeholder="Board Title..."
-                                    className="w-full bg-transparent text-xl font-bold text-white outline-none placeholder-zinc-700"
-                                />
-                            </div>
-                            <div className="flex items-center justify-between relative z-10">
-                                <button
-                                    type="button"
-                                    onClick={() => setIsCreating(false)}
-                                    className="text-sm font-medium text-zinc-500 hover:text-white transition-colors"
-                                >
-                                    Cancel
-                                </button>
-                                <button
-                                    type="submit"
-                                    className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
-                                >
-                                    Create Board
-                                </button>
-                            </div>
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] rounded-full -translate-y-1/2 translate-x-1/2" />
-                        </motion.form>
-                    ) : (
-                        <motion.button
-                            key="create-btn"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            onClick={() => setIsCreating(true)}
-                            className="h-48 rounded-3xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 group transition-all flex flex-col items-center justify-center gap-4 group"
-                        >
-                            <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-zinc-500 group-hover:text-primary group-hover:scale-110 transition-all">
-                                <Plus className="h-6 w-6" />
-                            </div>
-                            <span className="text-sm font-semibold text-zinc-500 group-hover:text-white transition-colors">Create new board</span>
-                        </motion.button>
-                    )}
-                </AnimatePresence>
-            )}
+    const renderBoardGrid = useCallback((boardsToRender: Board[], showCreate = false) => {
+        const userId = session?.user?.id;
 
-            {boardsToRender.map((board, index) => {
-                const isOwner = board.userId === session?.user?.id;
-                return (
-                    <motion.div
-                        key={board.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        onClick={() => selectBoard(board.id)}
-                        className="group relative h-48 rounded-3xl border border-white/5 bg-zinc-900/40 p-6 flex flex-col justify-between hover:border-white/20 hover:bg-zinc-800/40 transition-all cursor-pointer overflow-hidden"
-                    >
-                        <div className="relative z-10 flex items-start justify-between">
-                            <div className="space-y-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors">{board.title}</h3>
-                                    {!isOwner && (
-                                        <span className="bg-primary/10 text-primary text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Shared</span>
-                                    )}
+        return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {showCreate && (
+                    <AnimatePresence mode="popLayout">
+                        {isCreating ? (
+                            <motion.form
+                                key="create-form"
+                                initial={{ opacity: 0, scale: 0.95 }}
+                                animate={{ opacity: 1, scale: 1 }}
+                                exit={{ opacity: 0, scale: 0.95 }}
+                                onSubmit={handleCreate}
+                                className="relative h-48 rounded-3xl border border-primary/30 bg-primary/5 p-6 flex flex-col justify-between overflow-hidden group shadow-2xl shadow-primary/10"
+                            >
+                                <div className="space-y-4 relative z-10">
+                                    <span className="text-[10px] font-bold text-primary uppercase tracking-widest">New Project</span>
+                                    <input
+                                        autoFocus
+                                        value={newTitle}
+                                        onChange={(e) => setNewTitle(e.target.value)}
+                                        placeholder="Board Title..."
+                                        className="w-full bg-transparent text-xl font-bold text-white outline-none placeholder-zinc-700"
+                                    />
                                 </div>
-                                <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium">
-                                    <Clock className="h-3 w-3" />
-                                    <span>{isOwner ? 'Personal' : 'External'}</span>
+                                <div className="flex items-center justify-between relative z-10">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreating(false)}
+                                        className="text-sm font-medium text-zinc-500 hover:text-white transition-colors"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-4 py-2 rounded-xl bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-all shadow-lg shadow-primary/20"
+                                    >
+                                        Create Board
+                                    </button>
                                 </div>
-                            </div>
-                            {isOwner && (
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation();
-                                        if (confirm('Delete this board?')) deleteBoard(board.id);
-                                    }}
-                                    className="p-2 rounded-xl bg-white/5 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </button>
-                            )}
-                        </div>
+                                <div className="absolute top-0 right-0 w-32 h-32 bg-primary/20 blur-[60px] rounded-full -translate-y-1/2 translate-x-1/2" />
+                            </motion.form>
+                        ) : (
+                            <motion.button
+                                key="create-btn"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                onClick={() => setIsCreating(true)}
+                                className="h-48 rounded-3xl border border-dashed border-white/10 hover:border-primary/50 hover:bg-primary/5 group transition-all flex flex-col items-center justify-center gap-4 group"
+                            >
+                                <div className="p-4 rounded-2xl bg-white/5 border border-white/5 text-zinc-500 group-hover:text-primary group-hover:scale-110 transition-all">
+                                    <Plus className="h-6 w-6" />
+                                </div>
+                                <span className="text-sm font-semibold text-zinc-500 group-hover:text-white transition-colors">Create new board</span>
+                            </motion.button>
+                        )}
+                    </AnimatePresence>
+                )}
 
-                        <div className="relative z-10 flex items-center justify-between">
-                            <div className="flex -space-x-2">
-                                {[1, 2].map((i) => (
-                                    <div key={i} className="h-7 w-7 rounded-full border-2 border-zinc-950 bg-zinc-800 overflow-hidden">
-                                        <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=user${i + index}`} alt="User" />
+                {boardsToRender.map((board, index) => {
+                    const isOwner = board.userId === userId;
+                    return (
+                        <motion.div
+                            key={board.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            transition={{ delay: index * 0.05 }}
+                            layout="position"
+                            onClick={() => selectBoard(board.id)}
+                            className="group relative h-48 rounded-3xl border border-white/5 bg-zinc-900/40 p-6 flex flex-col justify-between hover:border-white/20 hover:bg-zinc-800/40 transition-all cursor-pointer overflow-hidden"
+                        >
+                            <div className="relative z-10 flex items-start justify-between">
+                                <div className="space-y-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-xl font-bold text-white group-hover:text-primary transition-colors">{board.title}</h3>
+                                        {!isOwner && (
+                                            <span className="bg-primary/10 text-primary text-[8px] font-bold px-1.5 py-0.5 rounded-full uppercase tracking-tighter">Shared</span>
+                                        )}
                                     </div>
-                                ))}
-                                <div className="h-7 w-7 rounded-full border-2 border-zinc-950 bg-zinc-900 flex items-center justify-center text-[10px] text-zinc-500 font-bold">
-                                    +3
+                                    <div className="flex items-center gap-2 text-zinc-500 text-xs font-medium">
+                                        <Clock className="h-3 w-3" />
+                                        <span>{isOwner ? 'Personal' : 'External'}</span>
+                                    </div>
+                                </div>
+                                {isOwner && (
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            if (confirm('Delete this board?')) deleteBoard(board.id);
+                                        }}
+                                        className="p-2 rounded-xl bg-white/5 text-zinc-600 hover:text-rose-500 hover:bg-rose-500/10 opacity-0 group-hover:opacity-100 transition-all"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </button>
+                                )}
+                            </div>
+
+                            <div className="relative z-10 flex items-center justify-between">
+                                <div className="flex -space-x-2">
+                                    {[1, 2].map((i) => (
+                                        <div key={i} className="h-7 w-7 rounded-full border-2 border-zinc-950 bg-zinc-800 overflow-hidden">
+                                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=user${i + index}`} alt="User" />
+                                        </div>
+                                    ))}
+                                    <div className="h-7 w-7 rounded-full border-2 border-zinc-950 bg-zinc-900 flex items-center justify-center text-[10px] text-zinc-500 font-bold">
+                                        +3
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-500 group-hover:text-white transition-colors">
+                                    VIEW BOARD
+                                    <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
                                 </div>
                             </div>
-                            <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-500 group-hover:text-white transition-colors">
-                                VIEW BOARD
-                                <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-1" />
-                            </div>
-                        </div>
 
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/20 transition-all" />
-                    </motion.div>
-                );
-            })}
-        </div>
-    );
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-primary/5 blur-3xl rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-primary/20 transition-all" />
+                        </motion.div>
+                    );
+                })}
+            </div>
+        );
+    }, [isCreating, newTitle, handleCreate, selectBoard, deleteBoard, session?.user?.id]);
 
     return (
         <div className="flex-1 overflow-y-auto p-8 no-scrollbar bg-background text-zinc-200">
             <div className="max-w-6xl mx-auto space-y-12">
-                {/* Header Section */}
                 <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                     <div className="space-y-2">
                         <div className="flex items-center gap-2 text-primary font-bold tracking-tighter text-sm uppercase">
@@ -191,7 +199,6 @@ export const Dashboard: React.FC = () => {
                     </div>
                 </header>
 
-                {/* Invitations Section */}
                 <AnimatePresence>
                     {invites.length > 0 && (
                         <motion.section
@@ -247,7 +254,6 @@ export const Dashboard: React.FC = () => {
                     )}
                 </AnimatePresence>
 
-                {/* Owned Boards Section */}
                 <section className="space-y-6">
                     <div className="flex items-center gap-3">
                         <h2 className="text-lg font-bold text-white">Your Boards</h2>
@@ -257,7 +263,6 @@ export const Dashboard: React.FC = () => {
                     {renderBoardGrid(ownedBoards, true)}
                 </section>
 
-                {/* Shared Boards Section */}
                 {sharedBoards.length > 0 && (
                     <section className="space-y-6">
                         <div className="flex items-center gap-3">
@@ -269,7 +274,6 @@ export const Dashboard: React.FC = () => {
                     </section>
                 )}
 
-                {/* Empty State */}
                 {boards.length === 0 && !isCreating && (
                     <div className="h-64 flex flex-col items-center justify-center text-center space-y-4 opacity-50">
                         <div className="p-6 rounded-3xl bg-white/5">

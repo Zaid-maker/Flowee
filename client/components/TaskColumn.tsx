@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import { Plus, X, ListFilter } from 'lucide-react';
 import { List, Priority, useBoardStore } from '../app/store';
@@ -12,7 +12,7 @@ interface TaskColumnProps {
     list: List;
 }
 
-export const TaskColumn: React.FC<TaskColumnProps> = ({ list }) => {
+export const TaskColumn: React.FC<TaskColumnProps> = React.memo(({ list }) => {
     const [isAdding, setIsAdding] = useState(false);
     const [content, setContent] = useState('');
     const [priority, setPriority] = useState<Priority>('low');
@@ -27,6 +27,13 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({ list }) => {
             setIsAdding(false);
         }
     };
+
+    // Stable card list rendering
+    const cards = useMemo(() => {
+        return list.cards.map((card, index) => (
+            <TaskCard key={card.id} card={card} index={index} listId={list.id} />
+        ));
+    }, [list.cards, list.id]);
 
     return (
         <div className="flex h-full w-80 flex-shrink-0 flex-col rounded-2xl glass p-4">
@@ -52,21 +59,19 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({ list }) => {
                             snapshot.isDraggingOver ? 'bg-white/5' : 'bg-transparent'
                         )}
                     >
-                        {list.cards.map((card, index) => (
-                            <TaskCard key={card.id} card={card} index={index} listId={list.id} />
-                        ))}
+                        {cards}
                         {provided.placeholder}
                     </div>
                 )}
             </Droppable>
 
             <div className="mt-4">
-                <AnimatePresence>
+                <AnimatePresence mode="popLayout">
                     {isAdding ? (
                         <motion.form
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: 10 }}
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
                             onSubmit={handleSubmit}
                             className="rounded-xl bg-zinc-800/50 p-3 border border-white/5"
                         >
@@ -133,4 +138,6 @@ export const TaskColumn: React.FC<TaskColumnProps> = ({ list }) => {
             </div>
         </div>
     );
-};
+});
+
+TaskColumn.displayName = 'TaskColumn';

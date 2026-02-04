@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { DragDropContext, DropResult } from '@hello-pangea/dnd';
 import { useBoardStore } from '../app/store';
 import { TaskColumn } from './TaskColumn';
@@ -9,11 +9,16 @@ import { Plus, X } from 'lucide-react';
 import { CardDetailsModal } from './CardDetailsModal';
 
 export const Board: React.FC = () => {
-    const { lists, moveCard, reorderCards, addList } = useBoardStore();
+    // Selective store subscription for better performance
+    const lists = useBoardStore(state => state.lists);
+    const moveCard = useBoardStore(state => state.moveCard);
+    const reorderCards = useBoardStore(state => state.reorderCards);
+    const addList = useBoardStore(state => state.addList);
+
     const [isAddingList, setIsAddingList] = useState(false);
     const [listTitle, setListTitle] = useState('');
 
-    const onDragEnd = (result: DropResult) => {
+    const onDragEnd = useCallback((result: DropResult) => {
         const { source, destination, draggableId } = result;
 
         if (!destination) return;
@@ -30,7 +35,7 @@ export const Board: React.FC = () => {
         } else {
             moveCard(source.droppableId, destination.droppableId, draggableId, destination.index);
         }
-    };
+    }, [reorderCards, moveCard]);
 
     const handleAddList = (e: React.FormEvent) => {
         e.preventDefault();
@@ -54,7 +59,7 @@ export const Board: React.FC = () => {
                     ))}
 
                     <div className="w-80 flex-shrink-0">
-                        <AnimatePresence mode="wait">
+                        <AnimatePresence mode="popLayout">
                             {isAddingList ? (
                                 <motion.form
                                     key="add-list-form"

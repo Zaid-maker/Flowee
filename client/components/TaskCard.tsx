@@ -2,10 +2,9 @@
 
 import React from 'react';
 import { Draggable } from '@hello-pangea/dnd';
-import { MoreHorizontal, Trash2, Clock, CheckCircle2 } from 'lucide-react';
-import { Card, Priority, useBoardStore } from '../app/store';
+import { Trash2, Clock, CheckCircle2 } from 'lucide-react';
+import { Card, useBoardStore } from '../app/store';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 import { createPortal } from 'react-dom';
 
 interface TaskCardProps {
@@ -20,7 +19,7 @@ const priorityColors = {
     high: 'bg-rose-500/10 text-rose-500 border-rose-500/20',
 };
 
-export const TaskCard: React.FC<TaskCardProps> = ({ card, index, listId }) => {
+export const TaskCard: React.FC<TaskCardProps> = React.memo(({ card, index, listId }) => {
     const deleteCard = useBoardStore((state) => state.deleteCard);
     const openCardDetails = useBoardStore((state) => state.openCardDetails);
 
@@ -90,4 +89,6 @@ export const TaskCard: React.FC<TaskCardProps> = ({ card, index, listId }) => {
             }}
         </Draggable>
     );
-};
+});
+
+TaskCard.displayName = 'TaskCard';
