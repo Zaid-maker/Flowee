@@ -125,7 +125,7 @@ export default function AuthenticatedLayout({
                 />
 
                 {/* Content Area */}
-                <div className="flex-1 overflow-hidden bg-zinc-950/10">
+                <div className="flex-1 flex flex-col min-h-0 bg-zinc-950/10">
                     {children}
                 </div>
 

@@ -47,7 +47,7 @@ export const Board: React.FC = () => {
     };
 
     return (
-        <div className="h-full w-full overflow-x-auto p-6 no-scrollbar">
+        <div className="h-full w-full overflow-x-auto p-6">
             <DragDropContext onDragEnd={onDragEnd}>
                 <motion.div
                     initial={{ opacity: 0, y: 20 }}
