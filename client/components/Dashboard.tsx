@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useRouter } from 'next/navigation';
 import {
     Plus,
     Trash2,
@@ -20,6 +21,7 @@ import { useSession } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
 
 export const Dashboard: React.FC = () => {
+    const router = useRouter();
     const { data: session } = useSession();
     const boards = useBoardStore(state => state.boards);
     const invites = useBoardStore(state => state.invites);
@@ -31,6 +33,11 @@ export const Dashboard: React.FC = () => {
 
     const [isCreating, setIsCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
+
+    const handleBoardClick = useCallback((id: string) => {
+        selectBoard(id);
+        router.push(`/board/${id}`);
+    }, [selectBoard, router]);
 
     // Memoize board filtering
     const { ownedBoards, sharedBoards } = useMemo(() => {
@@ -44,10 +51,13 @@ export const Dashboard: React.FC = () => {
     const handleCreate = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newTitle.trim()) return;
-        await addBoard(newTitle.trim());
+        const newBoard = await addBoard(newTitle.trim());
+        if (newBoard) {
+            router.push(`/board/${newBoard.id}`);
+        }
         setNewTitle('');
         setIsCreating(false);
-    }, [addBoard, newTitle]);
+    }, [addBoard, newTitle, router]);
 
     const renderBoardGrid = useCallback((boardsToRender: Board[], showCreate = false) => {
         const userId = session?.user?.id;
@@ -118,7 +128,7 @@ export const Dashboard: React.FC = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                             layout="position"
-                            onClick={() => selectBoard(board.id)}
+                            onClick={() => handleBoardClick(board.id)}
                             className="group relative h-48 rounded-3xl border border-white/5 bg-zinc-900/40 p-6 flex flex-col justify-between hover:border-white/20 hover:bg-zinc-800/40 transition-all cursor-pointer overflow-hidden"
                         >
                             <div className="relative z-10 flex items-start justify-between">

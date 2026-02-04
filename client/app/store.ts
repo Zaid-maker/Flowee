@@ -58,7 +58,7 @@ interface BoardStore {
     activeBoardId: string | null;
     activeCardId: string | null;
     setBoards: (boards: Board[]) => void;
-    addBoard: (title: string) => Promise<void>;
+    addBoard: (title: string) => Promise<Board>;
     deleteBoard: (id: string) => Promise<void>;
     selectBoard: (id: string | null) => void;
     openCardDetails: (cardId: string) => void;
@@ -120,8 +120,10 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             boards: [newBoard, ...state.boards],
             activeBoardId: newBoard.id,
             lists: [],
+            isLoaded: false
         }));
         get().addToast(`Board "${title}" created successfully!`, 'success');
+        return newBoard;
     },
 
 
