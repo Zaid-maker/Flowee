@@ -16,23 +16,24 @@ export default function BoardPage() {
     const userId = session?.user?.id;
 
     const activeBoardId = useBoardStore(state => state.activeBoardId);
-    const isLoaded = useBoardStore(state => state.isLoaded);
-    const selectBoard = useBoardStore(state => state.selectBoard);
     const setLists = useBoardStore(state => state.setLists);
+    const selectBoard = useBoardStore(state => state.selectBoard);
     const fetchBoardMembers = useBoardStore(state => state.fetchBoardMembers);
 
     const [isFetching, setIsFetching] = useState(false);
 
     useEffect(() => {
-        if (boardId && boardId !== activeBoardId) {
-            selectBoard(boardId);
-        }
-    }, [boardId, activeBoardId, selectBoard]);
+        if (!userId || !boardId) return;
 
-    useEffect(() => {
-        async function fetchBoard() {
-            if (userId && boardId && (!isLoaded || activeBoardId !== boardId)) {
+        const loadBoardData = async () => {
+            // Only fetch if we are switching to a new board OR we don't have lists yet
+            const needsFetch = boardId !== activeBoardId;
+
+            if (needsFetch) {
                 setIsFetching(true);
+                // First sync the store state
+                selectBoard(boardId);
+
                 try {
                     const data = await getBoardData(boardId);
                     if (data) {
@@ -50,21 +51,19 @@ export default function BoardPage() {
                         }));
                         setLists(mappedLists);
                     }
+                    await fetchBoardMembers();
                 } catch (error) {
                     console.error('Failed to load board:', error);
                 } finally {
                     setIsFetching(false);
                 }
             }
-        }
+        };
 
-        if (boardId) {
-            fetchBoard();
-            fetchBoardMembers();
-        }
-    }, [userId, boardId, activeBoardId, isLoaded, setLists, fetchBoardMembers]);
+        loadBoardData();
+    }, [userId, boardId, selectBoard, setLists, fetchBoardMembers]); // Removed activeBoardId from dependencies to prevent re-triggering after selection
 
-    if (isFetching) {
+    if (isFetching && boardId !== activeBoardId) {
         return (
             <div className="h-full w-full flex flex-col items-center justify-center gap-4 opacity-50">
                 <Loader2 className="h-8 w-8 animate-spin text-primary" />

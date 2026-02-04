@@ -11,11 +11,14 @@ export default function DashboardPage() {
     const { data: session } = useSession();
     const userId = session?.user?.id;
     const selectBoard = useBoardStore(state => state.selectBoard);
+    const activeBoardId = useBoardStore(state => state.activeBoardId);
     const setBoards = useBoardStore(state => state.setBoards);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        selectBoard(null);
+        if (activeBoardId !== null) {
+            selectBoard(null);
+        }
         async function fetchBoards() {
             if (userId) {
                 try {
@@ -31,7 +34,7 @@ export default function DashboardPage() {
             }
         }
         fetchBoards();
-    }, [userId, selectBoard, setBoards]);
+    }, [userId, selectBoard, setBoards, activeBoardId]);
 
     if (isLoading) {
         return (
