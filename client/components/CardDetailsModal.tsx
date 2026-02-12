@@ -22,17 +22,21 @@ import { format } from 'date-fns';
 export const CardDetailsModal: React.FC = () => {
     const { lists, activeCardId, closeCardDetails, updateCard, deleteCard } = useBoardStore();
 
-    // Find active card and its list
-    let activeCard: any = null;
-    let listId: string = "";
+    // Use useMemo to find active card and its list for better performance and reactivity
+    const { activeCard, activeList } = React.useMemo(() => {
+        let card: any = null;
+        let list: any = null;
 
-    lists.forEach(list => {
-        const card = list.cards.find(c => c.id === activeCardId);
-        if (card) {
-            activeCard = card;
-            listId = list.id;
+        for (const l of lists) {
+            const foundCard = l.cards.find(c => c.id === activeCardId);
+            if (foundCard) {
+                card = foundCard;
+                list = l;
+                break;
+            }
         }
-    });
+        return { activeCard: card, activeList: list };
+    }, [lists, activeCardId]);
 
     const [content, setContent] = useState(activeCard?.content || '');
     const [description, setDescription] = useState(activeCard?.description || '');
@@ -51,8 +55,9 @@ export const CardDetailsModal: React.FC = () => {
     if (!activeCard) return null;
 
     const handleUpdate = async (updates: any) => {
+        if (!activeList) return;
         setIsSaving(true);
-        await updateCard(listId, activeCard.id, updates);
+        await updateCard(activeList.id, activeCard.id, updates);
         setIsSaving(false);
     };
 
@@ -169,7 +174,7 @@ export const CardDetailsModal: React.FC = () => {
                                         <div className="space-y-2">
                                             <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">In List</span>
                                             <div className="px-3 py-1.5 rounded-lg border border-white/5 bg-white/5 text-[11px] font-medium text-white">
-                                                {lists.find(l => l.id === listId)?.title}
+                                                {activeList?.title || 'Unknown List'}
                                             </div>
                                         </div>
                                     </div>
@@ -283,8 +288,10 @@ export const CardDetailsModal: React.FC = () => {
 
                                         <button
                                             onClick={() => {
-                                                deleteCard(listId, activeCard.id);
-                                                closeCardDetails();
+                                                if (activeList) {
+                                                    deleteCard(activeList.id, activeCard.id);
+                                                    closeCardDetails();
+                                                }
                                             }}
                                             className="w-full flex items-center gap-3 p-4 rounded-2xl border border-rose-500/10 text-rose-500/70 hover:bg-rose-500/10 hover:text-rose-500 transition-all text-sm font-medium"
                                         >
