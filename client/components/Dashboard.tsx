@@ -10,15 +10,17 @@ import {
     Clock,
     ChevronRight,
     Search,
-    Filter,
     Bell,
     Check,
     X as Close,
-    Sparkles
+    Sparkles,
+    SearchX
 } from 'lucide-react';
 import { useBoardStore, Board } from '@/app/store';
 import { useSession } from '@/lib/auth-client';
 import { cn } from '@/lib/utils';
+import { BoardSearch } from './BoardSearch';
+import { BoardFilter, type SortOption, type FilterOption } from './BoardFilter';
 
 export const Dashboard: React.FC = () => {
     const router = useRouter();
@@ -33,20 +35,54 @@ export const Dashboard: React.FC = () => {
 
     const [isCreating, setIsCreating] = useState(false);
     const [newTitle, setNewTitle] = useState('');
+    const [searchQuery, setSearchQuery] = useState('');
+    const [sortBy, setSortBy] = useState<SortOption>('date-newest');
+    const [filterType, setFilterType] = useState<FilterOption>('all');
 
     const handleBoardClick = useCallback((id: string) => {
         selectBoard(id);
         router.push(`/board/${id}`);
     }, [selectBoard, router]);
 
-    // Memoize board filtering
-    const { ownedBoards, sharedBoards } = useMemo(() => {
+    // Memoize board filtering, searching, and sorting
+    const { ownedBoards, sharedBoards, totalFiltered } = useMemo(() => {
         const userId = session?.user?.id;
+        const query = searchQuery.toLowerCase().trim();
+
+        // Step 1: ownership filter
+        let filtered = boards;
+        if (filterType === 'owned') {
+            filtered = boards.filter(b => b.userId === userId);
+        } else if (filterType === 'shared') {
+            filtered = boards.filter(b => b.userId !== userId);
+        }
+
+        // Step 2: search
+        if (query) {
+            filtered = filtered.filter(b =>
+                b.title.toLowerCase().includes(query)
+            );
+        }
+
+        // Step 3: sort
+        const sorted = [...filtered].sort((a, b) => {
+            switch (sortBy) {
+                case 'title-asc': return a.title.localeCompare(b.title);
+                case 'title-desc': return b.title.localeCompare(a.title);
+                case 'date-oldest': return a.id.localeCompare(b.id);
+                case 'date-newest':
+                default: return b.id.localeCompare(a.id);
+            }
+        });
+
         return {
-            ownedBoards: boards.filter(b => b.userId === userId),
-            sharedBoards: boards.filter(b => b.userId !== userId)
+            ownedBoards: sorted.filter(b => b.userId === userId),
+            sharedBoards: sorted.filter(b => b.userId !== userId),
+            totalFiltered: sorted.length,
         };
-    }, [boards, session?.user?.id]);
+    }, [boards, session?.user?.id, searchQuery, sortBy, filterType]);
+
+    const isSearching = searchQuery.trim().length > 0;
 
     const handleCreate = useCallback(async (e: React.FormEvent) => {
         e.preventDefault();
@@ -196,16 +232,13 @@ export const Dashboard: React.FC = () => {
                     </div>
 
                     <div className="flex items-center gap-2 sm:gap-3">
-                        <div className="relative flex-1 sm:flex-initial">
-                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
-                            <input
-                                placeholder="Search..."
-                                className="h-11 w-full sm:w-48 lg:w-64 pl-10 pr-4 rounded-xl bg-white/5 border border-white/10 text-sm text-zinc-300 outline-none focus:border-primary/50 transition-all"
-                            />
-                        </div>
-                        <button className="h-11 px-4 rounded-xl bg-white/5 border border-white/10 text-zinc-400 hover:text-white transition-all">
-                            <Filter className="h-4 w-4" />
-                        </button>
+                        <BoardSearch value={searchQuery} onChange={setSearchQuery} />
+                        <BoardFilter
+                            sortBy={sortBy}
+                            filterType={filterType}
+                            onSortChange={setSortBy}
+                            onFilterChange={setFilterType}
+                        />
                     </div>
                 </header>
 
@@ -263,15 +296,32 @@ export const Dashboard: React.FC = () => {
                     )}
                 </AnimatePresence>
 
-                <section className="space-y-6">
-                    <div className="flex items-center gap-3">
-                        <h2 className="text-base sm:text-lg font-bold text-white">Your Boards</h2>
-                        <span className="h-1 flex-1 bg-white/5 rounded-full" />
-                        <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{ownedBoards.length} Total</span>
+                {/* No search results */}
+                {isSearching && totalFiltered === 0 && (
+                    <div className="h-48 sm:h-64 flex flex-col items-center justify-center text-center space-y-4 opacity-60">
+                        <div className="p-4 sm:p-6 rounded-3xl bg-white/5">
+                            <SearchX className="h-10 w-10 sm:h-12 sm:w-12 text-zinc-600" />
+                        </div>
+                        <div className="space-y-1">
+                            <h3 className="text-lg sm:text-xl font-bold text-white">No boards found</h3>
+                            <p className="text-xs sm:text-sm text-zinc-500">No boards match &ldquo;{searchQuery}&rdquo;. Try a different search.</p>
+                        </div>
                     </div>
-                    {renderBoardGrid(ownedBoards, true)}
-                </section>
+                )}
 
+                {/* Owned Boards */}
+                {(ownedBoards.length > 0 || (!isSearching && filterType !== 'shared')) && (
+                    <section className="space-y-6">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-base sm:text-lg font-bold text-white">Your Boards</h2>
+                            <span className="h-1 flex-1 bg-white/5 rounded-full" />
+                            <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-widest">{ownedBoards.length} Total</span>
+                        </div>
+                        {renderBoardGrid(ownedBoards, !isSearching && filterType !== 'shared')}
+                    </section>
+                )}
+
+                {/* Shared Boards */}
                 {sharedBoards.length > 0 && (
                     <section className="space-y-6">
                         <div className="flex items-center gap-3">
@@ -283,6 +333,7 @@ export const Dashboard: React.FC = () => {
                     </section>
                 )}
 
+                {/* Empty state - no boards at all */}
                 {boards.length === 0 && !isCreating && (
                     <div className="h-48 sm:h-64 flex flex-col items-center justify-center text-center space-y-4 opacity-50">
                         <div className="p-4 sm:p-6 rounded-3xl bg-white/5">

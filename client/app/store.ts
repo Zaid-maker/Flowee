@@ -82,6 +82,8 @@ interface BoardStore {
     declineInvite: (inviteId: string) => Promise<void>;
     inviteUser: (email: string) => Promise<void>;
     fetchBoardMembers: () => Promise<void>;
+    updateMemberRole: (memberId: string, role: "ADMIN" | "MEMBER" | "VIEWER") => Promise<void>;
+    removeMember: (memberId: string) => Promise<void>;
 
     // Notifications
     notifications: Notification[];
@@ -327,6 +329,38 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             set({ activeBoardMembers: members || [] });
         } finally {
             set({ isFetchingMembers: false });
+        }
+    },
+
+    updateMemberRole: async (memberId, role) => {
+        const { activeBoardId, addToast } = get();
+        if (!activeBoardId) return;
+
+        try {
+            await collabActions.updateMemberRole(activeBoardId, memberId, role);
+            set((state) => ({
+                activeBoardMembers: state.activeBoardMembers.map((m) =>
+                    m.id === memberId ? { ...m, role } : m
+                ),
+            }));
+            addToast("Role updated", "success");
+        } catch (error: any) {
+            addToast(error.message || "Failed to update role", "error");
+        }
+    },
+
+    removeMember: async (memberId) => {
+        const { activeBoardId, addToast } = get();
+        if (!activeBoardId) return;
+
+        try {
+            await collabActions.removeMember(activeBoardId, memberId);
+            set((state) => ({
+                activeBoardMembers: state.activeBoardMembers.filter((m) => m.id !== memberId),
+            }));
+            addToast("Member removed", "info");
+        } catch (error: any) {
+            addToast(error.message || "Failed to remove member", "error");
         }
     },
 

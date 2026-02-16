@@ -203,3 +203,24 @@ export async function removeMember(boardId: string, memberId: string) {
 
     revalidatePath("/");
 }
+export async function updateMemberRole(boardId: string, memberId: string, role: "ADMIN" | "MEMBER" | "VIEWER") {
+    const session = await getSession();
+    if (!session) throw new Error("Unauthorized");
+
+    const board = await prisma.board.findUnique({
+        where: { id: boardId },
+        select: { userId: true },
+    });
+
+    if (!board || board.userId !== session.user.id) {
+        throw new Error("Only the owner can manage member permissions");
+    }
+
+    // Role enum from prisma is uppercase
+    await prisma.boardMember.update({
+        where: { id: memberId },
+        data: { role },
+    });
+
+    revalidatePath("/");
+}
