@@ -89,7 +89,15 @@ export default function AuthenticatedLayout({
                     >
                         <LayoutGrid className="h-6 w-6" />
                     </button>
-                    <button className="text-zinc-500 transition-colors hover:text-white">
+                    <button
+                        onClick={() => {
+                            selectBoard(null);
+                            router.push('/calendar');
+                            setIsMobileSidebarOpen(false);
+                        }}
+                        className={pathname === "/calendar" ? "text-primary" : "text-zinc-500 hover:text-white transition-colors"}
+                        title="Calendar"
+                    >
                         <Calendar className="h-6 w-6" />
                     </button>
                     <button className="text-zinc-500 transition-colors hover:text-white">

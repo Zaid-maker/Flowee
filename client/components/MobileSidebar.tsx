@@ -43,7 +43,7 @@ export const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onClose })
 
     const navItems = [
         { label: 'Dashboard', icon: LayoutGrid, path: '/dashboard' },
-        { label: 'Calendar', icon: Calendar, path: '#' },
+        { label: 'Calendar', icon: Calendar, path: '/calendar' },
         { label: 'Team', icon: Users, path: '#' },
         { label: 'Settings', icon: Settings, path: '#' },
     ];

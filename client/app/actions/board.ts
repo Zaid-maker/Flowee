@@ -268,3 +268,24 @@ export async function reorderCards(listId: string, cardIds: string[]) {
 
     revalidatePath("/");
 }
+
+export async function getCalendarCards() {
+    const session = await getSession();
+    if (!session) return null;
+
+    return await prisma.card.findMany({
+        where: {
+            OR: [
+                { userId: session.user.id },
+                { board: { members: { some: { userId: session.user.id } } } }
+            ],
+            deadline: { not: null }
+        },
+        include: {
+            board: {
+                select: { title: true, color: true }
+            }
+        },
+        orderBy: { deadline: "asc" }
+    });
+}

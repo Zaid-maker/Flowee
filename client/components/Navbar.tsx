@@ -12,6 +12,7 @@ import { useBoardStore } from '@/app/store';
 import { useSession } from '@/lib/auth-client';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { InviteModal } from '@/components/InviteModal';
+import { usePathname } from 'next/navigation';
 
 interface NavbarProps {
     onOpenMobileSidebar: () => void;
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
     const boards = useBoardStore(state => state.boards);
     const activeBoardId = useBoardStore(state => state.activeBoardId);
     const activeBoardMembers = useBoardStore(state => state.activeBoardMembers);
+    const pathname = usePathname();
 
     const [isInviteOpen, setIsInviteOpen] = useState(false);
 
@@ -53,10 +55,10 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
                     <div className="flex flex-col min-w-0">
                         <h1 className="text-sm sm:text-lg font-bold tracking-tight text-white leading-tight truncate">
-                            {activeBoardId ? activeBoard?.title : `Welcome, ${session.user.name || 'User'}`}
+                            {activeBoardId ? activeBoard?.title : pathname === '/calendar' ? 'Calendar' : `Welcome, ${session.user.name || 'User'}`}
                         </h1>
                         <p className="text-[10px] sm:text-xs font-medium text-zinc-500 tracking-wide uppercase truncate">
-                            {activeBoardId ? 'Board Interface' : 'Personal Dashboard'}
+                            {activeBoardId ? 'Board Interface' : pathname === '/calendar' ? 'Deadlines & Schedule' : 'Personal Dashboard'}
                         </p>
                     </div>
                 </div>
