@@ -39,6 +39,19 @@ export async function inviteUser(boardId: string, email: string) {
         throw new Error("User is already a member of this board");
     }
 
+    // Prevent duplicate pending invitations for the same email/board
+    const existingInvite = await prisma.boardInvitation.findFirst({
+        where: {
+            boardId,
+            email,
+            expiresAt: { gt: new Date() },
+        },
+    });
+
+    if (existingInvite) {
+        throw new Error("An invitation is already pending for this user");
+    }
+
     // Create invitation
     const token = crypto.randomUUID();
     const expiresAt = new Date();
@@ -117,19 +130,20 @@ export async function acceptInvite(inviteId: string) {
         throw new Error("Invitation expired");
     }
 
-    // Create membership
-    await prisma.boardMember.create({
-        data: {
-            userId: session.user.id,
-            boardId: invitation.boardId,
-            role: "MEMBER",
-        },
-    });
-
-    // Delete invitation
-    await prisma.boardInvitation.delete({
-        where: { id: inviteId },
-    });
+    // Create membership with the role the inviter chose, and remove the
+    // invitation atomically so acceptance can't half-apply.
+    await prisma.$transaction([
+        prisma.boardMember.create({
+            data: {
+                userId: session.user.id,
+                boardId: invitation.boardId,
+                role: invitation.role,
+            },
+        }),
+        prisma.boardInvitation.delete({
+            where: { id: inviteId },
+        }),
+    ]);
 
     revalidatePath("/");
 }
