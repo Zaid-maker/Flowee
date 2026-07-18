@@ -37,6 +37,16 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose }) => 
         }
     }, [isOpen, activeBoardId]);
 
+    // Close on Escape while the modal is open
+    useEffect(() => {
+        if (!isOpen) return;
+        const onKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        document.addEventListener('keydown', onKeyDown);
+        return () => document.removeEventListener('keydown', onKeyDown);
+    }, [isOpen, onClose]);
+
     const handleInvite = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!email.trim()) return;
@@ -85,6 +95,9 @@ export const InviteModal: React.FC<InviteModalProps> = ({ isOpen, onClose }) => 
 
                 {/* Modal */}
                 <motion.div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label="Share board"
                     initial={{ opacity: 0, scale: 0.95, y: 20 }}
                     animate={{ opacity: 1, scale: 1, y: 0 }}
                     exit={{ opacity: 0, scale: 0.95, y: 20 }}
