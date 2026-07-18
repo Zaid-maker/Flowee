@@ -34,6 +34,27 @@ export interface Board {
     userId: string;
 }
 
+export type BoardRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';
+
+export interface BoardInvite {
+    id: string;
+    email: string;
+    role: BoardRole;
+    boardId: string;
+    board: { title: string };
+    inviter: { name: string | null; email: string };
+    createdAt: Date | string;
+    expiresAt: Date | string;
+}
+
+export interface BoardMember {
+    id: string;
+    role: BoardRole;
+    userId: string;
+    boardId: string;
+    user: { name: string | null; email: string; image: string | null };
+}
+
 export interface Notification {
     id: string;
     type: string;
@@ -73,8 +94,8 @@ interface BoardStore {
     updateCard: (listId: string, cardId: string, updates: Partial<Card>) => Promise<void>;
 
     // Collaboration
-    invites: any[];
-    activeBoardMembers: any[];
+    invites: BoardInvite[];
+    activeBoardMembers: BoardMember[];
     isFetchingInvites: boolean;
     isFetchingMembers: boolean;
     fetchInvites: () => Promise<void>;
@@ -152,20 +173,31 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         const { activeBoardId } = get();
         if (!activeBoardId) return;
 
-        const newList = await actions.createList(activeBoardId, title);
-        set((state) => ({
-            lists: [...state.lists, { id: newList.id, title: newList.title, cards: [] }],
-        }));
-        get().addToast(`List "${title}" added.`, 'success');
+        try {
+            const newList = await actions.createList(activeBoardId, title);
+            set((state) => ({
+                lists: [...state.lists, { id: newList.id, title: newList.title, cards: [] }],
+            }));
+            get().addToast(`List "${title}" added.`, 'success');
+        } catch (error: any) {
+            get().addToast(error.message || 'Failed to add list.', 'error');
+        }
     },
 
     deleteList: async (listId) => {
         const list = get().lists.find(l => l.id === listId);
-        await actions.deleteList(listId);
+        // Optimistic removal with rollback on failure
+        const snapshot = get().lists;
         set((state) => ({
             lists: state.lists.filter((l) => l.id !== listId),
         }));
-        get().addToast(`List "${list?.title}" removed.`, 'info');
+        try {
+            await actions.deleteList(listId);
+            get().addToast(`List "${list?.title}" removed.`, 'info');
+        } catch (error: any) {
+            set({ lists: snapshot });
+            get().addToast(error.message || 'Failed to remove list.', 'error');
+        }
     },
 
     addCard: async (listId, content, priority = 'low') => {
@@ -173,42 +205,54 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
         if (!activeBoardId) return;
 
         const prismaPriority = priority.toUpperCase() as "LOW" | "MEDIUM" | "HIGH";
-        const newCard = await actions.createCard(activeBoardId, listId, content, prismaPriority);
-        set((state) => ({
-            lists: state.lists.map((l) =>
-                l.id === listId
-                    ? {
-                        ...l,
-                        cards: [
-                            ...l.cards,
-                            {
-                                id: newCard.id,
-                                content: newCard.content,
-                                priority,
-                                description: null,
-                                subtasks: []
-                            },
-                        ],
-                    }
-                    : l
-            ),
-        }));
-        get().addToast('Card added to list.', 'success');
+        try {
+            const newCard = await actions.createCard(activeBoardId, listId, content, prismaPriority);
+            set((state) => ({
+                lists: state.lists.map((l) =>
+                    l.id === listId
+                        ? {
+                            ...l,
+                            cards: [
+                                ...l.cards,
+                                {
+                                    id: newCard.id,
+                                    content: newCard.content,
+                                    priority,
+                                    description: null,
+                                    subtasks: []
+                                },
+                            ],
+                        }
+                        : l
+                ),
+            }));
+            get().addToast('Card added to list.', 'success');
+        } catch (error: any) {
+            get().addToast(error.message || 'Failed to add card.', 'error');
+        }
     },
 
     deleteCard: async (listId, cardId) => {
-        await actions.deleteCard(cardId);
+        // Optimistic removal with rollback on failure
+        const snapshot = get().lists;
         set((state) => ({
             lists: state.lists.map((l) =>
                 l.id === listId ? { ...l, cards: l.cards.filter((c) => c.id !== cardId) } : l
             ),
         }));
-        get().addToast('Card deleted.', 'info');
+        try {
+            await actions.deleteCard(cardId);
+            get().addToast('Card deleted.', 'info');
+        } catch (error: any) {
+            set({ lists: snapshot });
+            get().addToast(error.message || 'Failed to delete card.', 'error');
+        }
     },
 
     moveCard: async (sourceListId, destListId, cardId, index) => {
         // Optimistic update
         const state = get();
+        const snapshot = state.lists;
         const sourceList = state.lists.find((l) => l.id === sourceListId);
         const destList = state.lists.find((l) => l.id === destListId);
         if (!sourceList || !destList) return;
@@ -234,17 +278,23 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             }),
         });
 
-        // Sync with DB
-        if (sourceListId === destListId) {
-            const cardIds = newDestCards.map(c => c.id);
-            await actions.reorderCards(sourceListId, cardIds);
-        } else {
-            await actions.moveCard(cardId, destListId, index);
+        // Sync with DB, rolling back the optimistic move if it fails
+        try {
+            if (sourceListId === destListId) {
+                const cardIds = newDestCards.map(c => c.id);
+                await actions.reorderCards(sourceListId, cardIds);
+            } else {
+                await actions.moveCard(cardId, destListId, index);
+            }
+        } catch (error: any) {
+            set({ lists: snapshot });
+            get().addToast(error.message || 'Failed to move card.', 'error');
         }
     },
 
     reorderCards: async (listId, startIndex, endIndex) => {
         const state = get();
+        const snapshot = state.lists;
         const list = state.lists.find(l => l.id === listId);
         if (!list) return;
 
@@ -256,8 +306,13 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             lists: state.lists.map(l => l.id === listId ? { ...l, cards: newCards } : l)
         });
 
-        const cardIds = newCards.map(c => c.id);
-        await actions.reorderCards(listId, cardIds);
+        try {
+            const cardIds = newCards.map(c => c.id);
+            await actions.reorderCards(listId, cardIds);
+        } catch (error: any) {
+            set({ lists: snapshot });
+            get().addToast(error.message || 'Failed to reorder cards.', 'error');
+        }
     },
 
     updateCard: async (listId, cardId, updates) => {
@@ -266,18 +321,21 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             prismaData.priority = updates.priority.toUpperCase();
         }
 
-        await actions.updateCard(cardId, prismaData);
-
-        set((state) => ({
-            lists: state.lists.map((l) =>
-                l.id === listId
-                    ? {
-                        ...l,
-                        cards: l.cards.map((c) => (c.id === cardId ? { ...c, ...updates } : c)),
-                    }
-                    : l
-            ),
-        }));
+        try {
+            await actions.updateCard(cardId, prismaData);
+            set((state) => ({
+                lists: state.lists.map((l) =>
+                    l.id === listId
+                        ? {
+                            ...l,
+                            cards: l.cards.map((c) => (c.id === cardId ? { ...c, ...updates } : c)),
+                        }
+                        : l
+                ),
+            }));
+        } catch (error: any) {
+            get().addToast(error.message || 'Failed to update card.', 'error');
+        }
     },
 
     // Collaboration Actions

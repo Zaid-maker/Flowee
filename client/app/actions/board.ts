@@ -4,9 +4,11 @@ import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { Prisma } from "@prisma/client";
+import { Prisma, BoardRole } from "@prisma/client";
 
 const prisma = getPrisma();
+
+type EffectiveRole = BoardRole | "OWNER";
 
 export type ListWithCards = Prisma.ListGetPayload<{
     include: { cards: true };
@@ -46,18 +48,14 @@ export async function createBoard(title: string) {
 
     // Seed default lists for the new board
     const defaultLists = ["To-Do", "Doing", "Done"];
-    await Promise.all(
-        defaultLists.map((title, index) =>
-            prisma.list.create({
-                data: {
-                    title,
-                    userId: session.user.id,
-                    boardId: board.id,
-                    order: index,
-                },
-            })
-        )
-    );
+    await prisma.list.createMany({
+        data: defaultLists.map((title, index) => ({
+            title,
+            userId: session.user.id,
+            boardId: board.id,
+            order: index,
+        })),
+    });
 
     revalidatePath("/");
     return board;
@@ -74,21 +72,34 @@ export async function deleteBoard(id: string) {
     revalidatePath("/");
 }
 
-async function checkAccess(boardId: string, userId: string, ownerOnly = false) {
+// Resolve the caller's effective role on a board. Owner short-circuits to "OWNER".
+async function getBoardRole(boardId: string, userId: string): Promise<EffectiveRole | null> {
     const board = await prisma.board.findUnique({
         where: { id: boardId },
         select: { userId: true },
     });
 
-    if (!board) return false;
-    if (board.userId === userId) return true;
-    if (ownerOnly) return false;
+    if (!board) return null;
+    if (board.userId === userId) return "OWNER";
 
     const membership = await prisma.boardMember.findFirst({
         where: { boardId, userId },
+        select: { role: true },
     });
 
-    return !!membership;
+    return membership?.role ?? null;
+}
+
+// Read access: any owner or member.
+async function checkAccess(boardId: string, userId: string) {
+    return (await getBoardRole(boardId, userId)) !== null;
+}
+
+// Write access: owner or a non-viewer member. Throws if not permitted.
+async function requireWriteAccess(boardId: string, userId: string): Promise<EffectiveRole> {
+    const role = await getBoardRole(boardId, userId);
+    if (!role || role === "VIEWER") throw new Error("Forbidden");
+    return role;
 }
 
 export async function getBoardData(boardId: string): Promise<ListWithCards[] | null> {
@@ -115,8 +126,7 @@ export async function createList(boardId: string, title: string) {
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
-    const hasAccess = await checkAccess(boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(boardId, session.user.id);
 
     const listCount = await prisma.list.count({
         where: { boardId },
@@ -146,8 +156,7 @@ export async function deleteList(listId: string) {
 
     if (!list) throw new Error("List not found");
 
-    const hasAccess = await checkAccess(list.boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(list.boardId, session.user.id);
 
     await prisma.list.delete({
         where: { id: listId },
@@ -160,8 +169,7 @@ export async function createCard(boardId: string, listId: string, content: strin
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
-    const hasAccess = await checkAccess(boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(boardId, session.user.id);
 
     const cardCount = await prisma.card.count({
         where: { listId },
@@ -193,8 +201,7 @@ export async function deleteCard(cardId: string) {
 
     if (!card) throw new Error("Card not found");
 
-    const hasAccess = await checkAccess(card.boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(card.boardId, session.user.id);
 
     await prisma.card.delete({
         where: { id: cardId },
@@ -214,8 +221,7 @@ export async function updateCard(cardId: string, data: Prisma.CardUpdateInput) {
 
     if (!cardRecord) throw new Error("Card not found");
 
-    const hasAccess = await checkAccess(cardRecord.boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(cardRecord.boardId, session.user.id);
 
     const card = await prisma.card.update({
         where: { id: cardId },
@@ -230,8 +236,27 @@ export async function moveCard(cardId: string, newListId: string, newOrder: numb
     const session = await getSession();
     if (!session) throw new Error("Unauthorized");
 
+    const cardRecord = await prisma.card.findUnique({
+        where: { id: cardId },
+        select: { boardId: true },
+    });
+
+    if (!cardRecord) throw new Error("Card not found");
+
+    await requireWriteAccess(cardRecord.boardId, session.user.id);
+
+    // Ensure the destination list belongs to the same board as the card.
+    const destList = await prisma.list.findUnique({
+        where: { id: newListId },
+        select: { boardId: true },
+    });
+
+    if (!destList || destList.boardId !== cardRecord.boardId) {
+        throw new Error("Invalid destination list");
+    }
+
     const card = await prisma.card.update({
-        where: { id: cardId, userId: session.user.id },
+        where: { id: cardId },
         data: {
             listId: newListId,
             order: newOrder,
@@ -253,11 +278,10 @@ export async function reorderCards(listId: string, cardIds: string[]) {
 
     if (!list) throw new Error("List not found");
 
-    const hasAccess = await checkAccess(list.boardId, session.user.id);
-    if (!hasAccess) throw new Error("Forbidden");
+    await requireWriteAccess(list.boardId, session.user.id);
 
-    // Batch update orders
-    await Promise.all(
+    // Batch update orders atomically so a partial failure can't corrupt ordering.
+    await prisma.$transaction(
         cardIds.map((id, index) =>
             prisma.card.update({
                 where: { id },
