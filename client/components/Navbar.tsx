@@ -9,29 +9,28 @@ import {
     Loader2
 } from 'lucide-react';
 import { useBoardStore } from '@/app/store';
-import { useSession } from '@/lib/auth-client';
 import { NotificationCenter } from '@/components/NotificationCenter';
 import { InviteModal } from '@/components/InviteModal';
 import { usePathname } from 'next/navigation';
+import type { ShellUser } from '@/components/AppShell';
 
 interface NavbarProps {
+    user: ShellUser;
     onOpenMobileSidebar: () => void;
     onDashboardClick: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+    user,
     onOpenMobileSidebar,
     onDashboardClick
 }) => {
-    const { data: session } = useSession();
     const boards = useBoardStore(state => state.boards);
     const activeBoardId = useBoardStore(state => state.activeBoardId);
     const activeBoardMembers = useBoardStore(state => state.activeBoardMembers);
     const pathname = usePathname();
 
     const [isInviteOpen, setIsInviteOpen] = useState(false);
-
-    if (!session) return null;
 
     const activeBoard = boards.find(b => b.id === activeBoardId);
 
@@ -55,7 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     )}
                     <div className="flex flex-col min-w-0">
                         <h1 className="text-sm sm:text-lg font-bold tracking-tight text-white leading-tight truncate">
-                            {activeBoardId ? activeBoard?.title : pathname === '/calendar' ? 'Calendar' : `Welcome, ${session.user.name || 'User'}`}
+                            {activeBoardId ? activeBoard?.title : pathname === '/calendar' ? 'Calendar' : `Welcome, ${user.name || 'User'}`}
                         </h1>
                         <p className="text-[10px] sm:text-xs font-medium text-zinc-500 tracking-wide uppercase truncate">
                             {activeBoardId ? 'Board Interface' : pathname === '/calendar' ? 'Deadlines & Schedule' : 'Personal Dashboard'}
