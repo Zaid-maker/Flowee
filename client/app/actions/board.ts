@@ -102,6 +102,18 @@ async function requireWriteAccess(boardId: string, userId: string): Promise<Effe
     return role;
 }
 
+export async function getBoard(boardId: string) {
+    const session = await getSession();
+    if (!session) return null;
+
+    const hasAccess = await checkAccess(boardId, session.user.id);
+    if (!hasAccess) return null;
+
+    return await prisma.board.findUnique({
+        where: { id: boardId },
+    });
+}
+
 export async function getBoardData(boardId: string): Promise<ListWithCards[] | null> {
     const session = await getSession();
     if (!session) return null;

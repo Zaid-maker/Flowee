@@ -22,9 +22,16 @@ import { cn } from '@/lib/utils';
 import { BoardSearch } from './BoardSearch';
 import { BoardFilter, type SortOption, type FilterOption } from './BoardFilter';
 
-export const Dashboard: React.FC = () => {
+interface DashboardProps {
+    // Provided by the server on initial render so the owned/shared split is
+    // correct during SSR (before the client session resolves).
+    currentUserId?: string;
+}
+
+export const Dashboard: React.FC<DashboardProps> = ({ currentUserId }) => {
     const router = useRouter();
     const { data: session } = useSession();
+    const userId = currentUserId ?? session?.user?.id;
     const boards = useBoardStore(state => state.boards);
     const invites = useBoardStore(state => state.invites);
     const addBoard = useBoardStore(state => state.addBoard);
@@ -46,7 +53,6 @@ export const Dashboard: React.FC = () => {
 
     // Memoize board filtering, searching, and sorting
     const { ownedBoards, sharedBoards, totalFiltered } = useMemo(() => {
-        const userId = session?.user?.id;
         const query = searchQuery.toLowerCase().trim();
 
         // Step 1: ownership filter
@@ -84,7 +90,7 @@ export const Dashboard: React.FC = () => {
             sharedBoards: sorted.filter(b => b.userId !== userId),
             totalFiltered: sorted.length,
         };
-    }, [boards, session?.user?.id, searchQuery, sortBy, filterType]);
+    }, [boards, userId, searchQuery, sortBy, filterType]);
 
     const isSearching = searchQuery.trim().length > 0;
 
@@ -100,8 +106,6 @@ export const Dashboard: React.FC = () => {
     }, [addBoard, newTitle, router]);
 
     const renderBoardGrid = useCallback((boardsToRender: Board[], showCreate = false) => {
-        const userId = session?.user?.id;
-
         return (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 sm:gap-6">
                 {showCreate && (
@@ -224,7 +228,7 @@ export const Dashboard: React.FC = () => {
                 })}
             </div>
         );
-    }, [isCreating, newTitle, handleCreate, selectBoard, deleteBoard, session?.user?.id]);
+    }, [isCreating, newTitle, handleCreate, deleteBoard, handleBoardClick, userId]);
 
     return (
         <div className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 bg-background text-zinc-200">
