@@ -6,6 +6,7 @@ import { Trash2, Clock, CheckCircle2 } from 'lucide-react';
 import { Card, useBoardStore } from '../app/store';
 import { cn } from '@/lib/utils';
 import { createPortal } from 'react-dom';
+import { format, isValid } from 'date-fns';
 
 interface TaskCardProps {
     card: Card;
@@ -63,10 +64,10 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({ card, index, list
                             {card.content}
                         </p>
 
-                        {card.deadline && (
+                        {card.deadline && isValid(new Date(card.deadline)) && (
                             <div className="mt-3 flex items-center gap-1.5 text-[11px] text-zinc-400">
                                 <Clock className="h-3 w-3" />
-                                <span>{card.deadline}</span>
+                                <span>{format(new Date(card.deadline), 'MMM d, yyyy')}</span>
                             </div>
                         )}
 

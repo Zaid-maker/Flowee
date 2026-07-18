@@ -11,30 +11,35 @@ export default function DashboardPage() {
     const { data: session } = useSession();
     const userId = session?.user?.id;
     const selectBoard = useBoardStore(state => state.selectBoard);
-    const activeBoardId = useBoardStore(state => state.activeBoardId);
     const setBoards = useBoardStore(state => state.setBoards);
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        if (activeBoardId !== null) {
-            selectBoard(null);
-        }
+        if (!userId) return;
+
+        // Reset any active board selection when landing on the dashboard.
+        selectBoard(null);
+
+        let cancelled = false;
         async function fetchBoards() {
-            if (userId) {
-                try {
-                    const allBoards = await getBoards();
-                    if (allBoards) {
-                        setBoards(allBoards);
-                    }
-                } catch (error) {
-                    console.error('Failed to load boards:', error);
-                } finally {
-                    setIsLoading(false);
+            try {
+                const allBoards = await getBoards();
+                if (allBoards && !cancelled) {
+                    setBoards(allBoards);
                 }
+            } catch (error) {
+                console.error('Failed to load boards:', error);
+            } finally {
+                if (!cancelled) setIsLoading(false);
             }
         }
         fetchBoards();
-    }, [userId, selectBoard, setBoards, activeBoardId]);
+
+        return () => {
+            cancelled = true;
+        };
+        // activeBoardId intentionally omitted to avoid a refetch loop when selectBoard(null) runs.
+    }, [userId, selectBoard, setBoards]);
 
     if (isLoading) {
         return (

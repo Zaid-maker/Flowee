@@ -15,7 +15,7 @@ export interface Card {
     content: string;
     description: string | null;
     priority: Priority;
-    deadline?: string;
+    deadline?: string | null;
     subtasks?: Subtask[];
 }
 
@@ -32,6 +32,8 @@ export interface Board {
     color: string | null;
     background: string | null;
     userId: string;
+    createdAt?: string | Date;
+    updatedAt?: string | Date;
 }
 
 export type BoardRole = 'OWNER' | 'ADMIN' | 'MEMBER' | 'VIEWER';

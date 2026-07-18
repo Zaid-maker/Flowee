@@ -65,13 +65,17 @@ export const Dashboard: React.FC = () => {
         }
 
         // Step 3: sort
+        const time = (b: Board) => {
+            const d = b.updatedAt ?? b.createdAt;
+            return d ? new Date(d).getTime() : 0;
+        };
         const sorted = [...filtered].sort((a, b) => {
             switch (sortBy) {
                 case 'title-asc': return a.title.localeCompare(b.title);
                 case 'title-desc': return b.title.localeCompare(a.title);
-                case 'date-oldest': return a.id.localeCompare(b.id);
+                case 'date-oldest': return time(a) - time(b);
                 case 'date-newest':
-                default: return b.id.localeCompare(a.id);
+                default: return time(b) - time(a);
             }
         });
 
@@ -164,8 +168,17 @@ export const Dashboard: React.FC = () => {
                             animate={{ opacity: 1, y: 0 }}
                             transition={{ delay: index * 0.05 }}
                             layout="position"
+                            role="button"
+                            tabIndex={0}
+                            aria-label={`Open board ${board.title}`}
                             onClick={() => handleBoardClick(board.id)}
-                            className="group relative h-40 sm:h-48 rounded-3xl border border-white/5 bg-zinc-900/40 p-5 sm:p-6 flex flex-col justify-between hover:border-white/20 hover:bg-zinc-800/40 transition-all cursor-pointer overflow-hidden"
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    handleBoardClick(board.id);
+                                }
+                            }}
+                            className="group relative h-40 sm:h-48 rounded-3xl border border-white/5 bg-zinc-900/40 p-5 sm:p-6 flex flex-col justify-between hover:border-white/20 hover:bg-zinc-800/40 transition-all cursor-pointer overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
                         >
                             <div className="relative z-10 flex items-start justify-between">
                                 <div className="space-y-1 min-w-0 flex-1">
@@ -194,16 +207,11 @@ export const Dashboard: React.FC = () => {
                             </div>
 
                             <div className="relative z-10 flex items-center justify-between">
-                                <div className="flex -space-x-1.5 sm:-space-x-2">
-                                    {[1, 2].map((i) => (
-                                        <div key={i} className="h-6 w-6 sm:h-7 sm:w-7 rounded-full border-2 border-zinc-950 bg-zinc-800 overflow-hidden shrink-0">
-                                            <img src={`https://api.dicebear.com/7.x/avataaars/svg?seed=user${i + index}`} alt="User" />
-                                        </div>
-                                    ))}
-                                    <div className="h-6 w-6 sm:h-7 sm:w-7 rounded-full border-2 border-zinc-950 bg-zinc-900 flex items-center justify-center text-[8px] sm:text-[10px] text-zinc-500 font-bold shrink-0">
-                                        +3
-                                    </div>
-                                </div>
+                                <div
+                                    className="h-2.5 w-2.5 rounded-full shrink-0"
+                                    style={{ backgroundColor: board.color || '#3b82f6' }}
+                                    aria-hidden="true"
+                                />
                                 <div className="flex items-center gap-1 text-[10px] font-bold text-zinc-500 group-hover:text-white transition-colors">
                                     <span className="hidden xs:inline">VIEW BOARD</span>
                                     <ChevronRight className="h-3 w-3 transition-transform group-hover:translate-x-0.5 sm:group-hover:translate-x-1" />
