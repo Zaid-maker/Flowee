@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import * as actions from './actions/board';
 import * as collabActions from './actions/collaboration';
+import * as labelActions from './actions/label';
 
 export type Priority = 'low' | 'medium' | 'high';
 
@@ -10,6 +11,12 @@ export interface Subtask {
     completed: boolean;
 }
 
+export interface Label {
+    id: string;
+    name: string;
+    color: string;
+}
+
 export interface Card {
     id: string;
     content: string;
@@ -17,6 +24,7 @@ export interface Card {
     priority: Priority;
     deadline?: string | null;
     subtasks?: Subtask[];
+    labels?: Label[];
 }
 
 export interface List {
@@ -95,6 +103,14 @@ interface BoardStore {
     reorderCards: (listId: string, startIndex: number, endIndex: number) => Promise<void>;
     updateCard: (listId: string, cardId: string, updates: Partial<Card>) => Promise<void>;
 
+    // Labels
+    boardLabels: Label[];
+    setBoardLabels: (labels: Label[]) => void;
+    addLabel: (name: string, color: string) => Promise<void>;
+    editLabel: (labelId: string, data: { name?: string; color?: string }) => Promise<void>;
+    removeLabel: (labelId: string) => Promise<void>;
+    toggleCardLabel: (listId: string, cardId: string, label: Label) => Promise<void>;
+
     // Collaboration
     invites: BoardInvite[];
     activeBoardMembers: BoardMember[];
@@ -129,6 +145,7 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
     isLoaded: false,
     activeBoardId: null,
     activeCardId: null,
+    boardLabels: [],
     invites: [],
     activeBoardMembers: [],
     isFetchingInvites: false,
@@ -337,6 +354,99 @@ export const useBoardStore = create<BoardStore>((set, get) => ({
             }));
         } catch (error: any) {
             get().addToast(error.message || 'Failed to update card.', 'error');
+        }
+    },
+
+    // Label Actions
+    setBoardLabels: (labels) => set({ boardLabels: labels }),
+
+    addLabel: async (name, color) => {
+        const { activeBoardId } = get();
+        if (!activeBoardId) return;
+        try {
+            const label = await labelActions.createLabel(activeBoardId, name, color);
+            set((state) => ({ boardLabels: [...state.boardLabels, label] }));
+            get().addToast(`Label "${label.name}" created.`, 'success');
+        } catch (error: any) {
+            get().addToast(error.message || 'Failed to create label.', 'error');
+        }
+    },
+
+    editLabel: async (labelId, data) => {
+        const snapshot = { boardLabels: get().boardLabels, lists: get().lists };
+        // Optimistic: update the label everywhere it appears.
+        set((state) => ({
+            boardLabels: state.boardLabels.map((l) => (l.id === labelId ? { ...l, ...data } : l)),
+            lists: state.lists.map((list) => ({
+                ...list,
+                cards: list.cards.map((c) => ({
+                    ...c,
+                    labels: c.labels?.map((l) => (l.id === labelId ? { ...l, ...data } : l)),
+                })),
+            })),
+        }));
+        try {
+            await labelActions.updateLabel(labelId, data);
+        } catch (error: any) {
+            set(snapshot);
+            get().addToast(error.message || 'Failed to update label.', 'error');
+        }
+    },
+
+    removeLabel: async (labelId) => {
+        const snapshot = { boardLabels: get().boardLabels, lists: get().lists };
+        // Optimistic: drop the label from the board and every card.
+        set((state) => ({
+            boardLabels: state.boardLabels.filter((l) => l.id !== labelId),
+            lists: state.lists.map((list) => ({
+                ...list,
+                cards: list.cards.map((c) => ({
+                    ...c,
+                    labels: c.labels?.filter((l) => l.id !== labelId),
+                })),
+            })),
+        }));
+        try {
+            await labelActions.deleteLabel(labelId);
+            get().addToast('Label deleted.', 'info');
+        } catch (error: any) {
+            set(snapshot);
+            get().addToast(error.message || 'Failed to delete label.', 'error');
+        }
+    },
+
+    toggleCardLabel: async (listId, cardId, label) => {
+        const snapshot = get().lists;
+        const card = get().lists.find((l) => l.id === listId)?.cards.find((c) => c.id === cardId);
+        if (!card) return;
+        const attached = !!card.labels?.some((l) => l.id === label.id);
+
+        // Optimistic toggle
+        set((state) => ({
+            lists: state.lists.map((l) =>
+                l.id === listId
+                    ? {
+                        ...l,
+                        cards: l.cards.map((c) =>
+                            c.id === cardId
+                                ? {
+                                    ...c,
+                                    labels: attached
+                                        ? (c.labels ?? []).filter((x) => x.id !== label.id)
+                                        : [...(c.labels ?? []), label],
+                                }
+                                : c
+                        ),
+                    }
+                    : l
+            ),
+        }));
+
+        try {
+            await labelActions.toggleCardLabel(cardId, label.id, !attached);
+        } catch (error: any) {
+            set({ lists: snapshot });
+            get().addToast(error.message || 'Failed to update label.', 'error');
         }
     },
 

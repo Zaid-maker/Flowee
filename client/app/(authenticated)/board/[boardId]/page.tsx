@@ -3,7 +3,8 @@ import { headers } from 'next/headers';
 import { auth } from '@/lib/auth';
 import { getBoard, getBoardData } from '@/app/actions/board';
 import { getBoardMembers } from '@/app/actions/collaboration';
-import { List, Priority, Subtask, BoardMember } from '@/app/store';
+import { getBoardLabels } from '@/app/actions/label';
+import { List, Priority, Subtask, BoardMember, Label } from '@/app/store';
 import { BoardClient } from './BoardClient';
 
 export default async function BoardPage({
@@ -16,7 +17,11 @@ export default async function BoardPage({
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session) redirect('/login');
 
-    const [board, data] = await Promise.all([getBoard(boardId), getBoardData(boardId)]);
+    const [board, data, labels] = await Promise.all([
+        getBoard(boardId),
+        getBoardData(boardId),
+        getBoardLabels(boardId),
+    ]);
 
     // No access / not found -> back to the dashboard.
     if (!board || !data) redirect('/dashboard');
@@ -33,7 +38,14 @@ export default async function BoardPage({
             priority: card.priority.toLowerCase() as Priority,
             deadline: card.deadline ? card.deadline.toISOString() : null,
             subtasks: (card.subtasks as unknown as Subtask[]) || [],
+            labels: card.labels.map((l) => ({ id: l.id, name: l.name, color: l.color })),
         })),
+    }));
+
+    const initialLabels: Label[] = (labels ?? []).map((l) => ({
+        id: l.id,
+        name: l.name,
+        color: l.color,
     }));
 
     return (
@@ -43,6 +55,7 @@ export default async function BoardPage({
             initialBoard={board}
             initialLists={initialLists}
             initialMembers={(members ?? []) as unknown as BoardMember[]}
+            initialLabels={initialLabels}
         />
     );
 }

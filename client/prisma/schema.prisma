@@ -77,10 +77,23 @@ model Board {
   user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   lists       List[]
   cards       Card[]
+  labels      Label[]
   members     BoardMember[]
   invites     BoardInvitation[]
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+}
+
+model Label {
+  id        String   @id @default(cuid())
+  name      String
+  color     String   @default("#3b82f6")
+  boardId   String
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  cards     Card[]   @relation("CardLabels")
+  createdAt DateTime @default(now())
+
+  @@index([boardId])
 }
 
 enum Priority {
@@ -155,6 +168,7 @@ model Card {
   userId      String
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   subtasks    Json? // Array of { content: string, completed: boolean }
+  labels      Label[]   @relation("CardLabels")
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }

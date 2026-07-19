@@ -13,13 +13,16 @@ import {
     AlertCircle,
     Calendar,
     ChevronRight,
-    Loader2
+    Loader2,
+    Tag,
+    Check
 } from 'lucide-react';
 import { useBoardStore, Priority, Subtask, Card } from '@/app/store';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 const PRIORITIES: Priority[] = ['low', 'medium', 'high'];
+const LABEL_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899', '#64748b'];
 
 export const CardDetailsModal: React.FC = () => {
     // Selective subscriptions to avoid re-rendering on unrelated store changes (toasts, notifications, ...)
@@ -28,6 +31,10 @@ export const CardDetailsModal: React.FC = () => {
     const closeCardDetails = useBoardStore(state => state.closeCardDetails);
     const updateCard = useBoardStore(state => state.updateCard);
     const deleteCard = useBoardStore(state => state.deleteCard);
+    const boardLabels = useBoardStore(state => state.boardLabels);
+    const addLabel = useBoardStore(state => state.addLabel);
+    const removeLabel = useBoardStore(state => state.removeLabel);
+    const toggleCardLabel = useBoardStore(state => state.toggleCardLabel);
 
     // Use useMemo to find active card and its list for better performance and reactivity
     const { activeCard, activeList } = React.useMemo(() => {
@@ -45,6 +52,9 @@ export const CardDetailsModal: React.FC = () => {
     const [subtasks, setSubtasks] = useState<Subtask[]>(activeCard?.subtasks || []);
     const [newSubtask, setNewSubtask] = useState('');
     const [isSaving, setIsSaving] = useState(false);
+    const [showLabelForm, setShowLabelForm] = useState(false);
+    const [newLabelName, setNewLabelName] = useState('');
+    const [newLabelColor, setNewLabelColor] = useState(LABEL_COLORS[0]);
 
     useEffect(() => {
         if (activeCard) {
@@ -71,6 +81,15 @@ export const CardDetailsModal: React.FC = () => {
         setIsSaving(true);
         await updateCard(activeList.id, activeCard.id, updates);
         setIsSaving(false);
+    };
+
+    const handleCreateLabel = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!newLabelName.trim()) return;
+        await addLabel(newLabelName.trim(), newLabelColor);
+        setNewLabelName('');
+        setNewLabelColor(LABEL_COLORS[0]);
+        setShowLabelForm(false);
     };
 
     const handleAddSubtask = (e: React.FormEvent) => {
@@ -207,6 +226,87 @@ export const CardDetailsModal: React.FC = () => {
                                                 {activeList?.title || 'Unknown List'}
                                             </div>
                                         </div>
+                                    </div>
+
+                                    {/* Labels */}
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2 text-zinc-400">
+                                            <Tag className="h-4 w-4" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider">Labels</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-2">
+                                            {boardLabels.map((label) => {
+                                                const attached = activeCard.labels?.some((l: { id: string }) => l.id === label.id);
+                                                return (
+                                                    <div key={label.id} className="group/label relative">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => activeList && toggleCardLabel(activeList.id, activeCard.id, label)}
+                                                            className={cn(
+                                                                "flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-white transition-all",
+                                                                attached ? "opacity-100 ring-2 ring-white/40" : "opacity-40 hover:opacity-80"
+                                                            )}
+                                                            style={{ backgroundColor: label.color }}
+                                                        >
+                                                            {attached && <Check className="h-3 w-3" />}
+                                                            {label.name}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeLabel(label.id)}
+                                                            title="Delete label"
+                                                            aria-label={`Delete label ${label.name}`}
+                                                            className="absolute -top-1.5 -right-1.5 hidden group-hover/label:flex h-4 w-4 items-center justify-center rounded-full bg-zinc-950 border border-white/20 text-zinc-400 hover:text-rose-500"
+                                                        >
+                                                            <X className="h-2.5 w-2.5" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                            {!showLabelForm && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setShowLabelForm(true)}
+                                                    className="flex items-center gap-1 rounded-lg border border-dashed border-white/15 px-2.5 py-1.5 text-[11px] font-bold uppercase tracking-wide text-zinc-500 hover:border-primary/50 hover:text-primary transition-all"
+                                                >
+                                                    <Plus className="h-3 w-3" /> New
+                                                </button>
+                                            )}
+                                        </div>
+                                        {showLabelForm && (
+                                            <form onSubmit={handleCreateLabel} className="space-y-3 rounded-xl bg-white/5 border border-white/10 p-3">
+                                                <input
+                                                    autoFocus
+                                                    value={newLabelName}
+                                                    onChange={(e) => setNewLabelName(e.target.value)}
+                                                    placeholder="Label name..."
+                                                    className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none focus:border-primary/50"
+                                                />
+                                                <div className="flex items-center gap-1.5">
+                                                    {LABEL_COLORS.map((color) => (
+                                                        <button
+                                                            key={color}
+                                                            type="button"
+                                                            onClick={() => setNewLabelColor(color)}
+                                                            aria-label={`Pick color ${color}`}
+                                                            className={cn(
+                                                                "h-6 w-6 rounded-md transition-all",
+                                                                newLabelColor === color ? "ring-2 ring-white/60 scale-110" : "hover:scale-105"
+                                                            )}
+                                                            style={{ backgroundColor: color }}
+                                                        />
+                                                    ))}
+                                                </div>
+                                                <div className="flex items-center justify-end gap-2">
+                                                    <button type="button" onClick={() => setShowLabelForm(false)} className="px-3 py-1.5 text-xs text-zinc-400 hover:text-white transition-colors">
+                                                        Cancel
+                                                    </button>
+                                                    <button type="submit" className="px-3 py-1.5 rounded-lg bg-primary text-white text-xs font-bold hover:bg-primary/90 transition-colors">
+                                                        Create
+                                                    </button>
+                                                </div>
+                                            </form>
+                                        )}
                                     </div>
 
                                     {/* Description */}

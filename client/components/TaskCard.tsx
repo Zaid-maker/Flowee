@@ -40,6 +40,21 @@ export const TaskCard: React.FC<TaskCardProps> = React.memo(({ card, index, list
                             snapshot.isDragging && 'z-[9999] scale-105 rotate-2 border-primary/50 shadow-primary/20 bg-zinc-800 pointer-events-none'
                         )}
                     >
+                        {card.labels && card.labels.length > 0 && (
+                            <div className="mb-2 flex flex-wrap gap-1">
+                                {card.labels.map((label) => (
+                                    <span
+                                        key={label.id}
+                                        title={label.name}
+                                        className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white/95"
+                                        style={{ backgroundColor: label.color }}
+                                    >
+                                        {label.name}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+
                         <div className="flex items-start justify-between gap-2">
                             <span
                                 className={cn(
