@@ -4,14 +4,13 @@ import { auth } from "@/lib/auth";
 import { getPrisma } from "@/lib/prisma";
 import { headers } from "next/headers";
 import { revalidatePath } from "next/cache";
-import { Prisma, BoardRole } from "@prisma/client";
+import { Prisma } from "@prisma/client";
+import { checkAccess, requireWriteAccess } from "@/lib/authz";
 
 const prisma = getPrisma();
 
-type EffectiveRole = BoardRole | "OWNER";
-
 export type ListWithCards = Prisma.ListGetPayload<{
-    include: { cards: true };
+    include: { cards: { include: { labels: true } } };
 }>;
 
 async function getSession() {
@@ -48,14 +47,28 @@ export async function createBoard(title: string) {
 
     // Seed default lists for the new board
     const defaultLists = ["To-Do", "Doing", "Done"];
-    await prisma.list.createMany({
-        data: defaultLists.map((title, index) => ({
-            title,
-            userId: session.user.id,
-            boardId: board.id,
-            order: index,
-        })),
-    });
+    const defaultLabels = [
+        { name: "Bug", color: "#ef4444" },
+        { name: "Feature", color: "#3b82f6" },
+        { name: "Enhancement", color: "#8b5cf6" },
+        { name: "Urgent", color: "#f59e0b" },
+    ];
+    await Promise.all([
+        prisma.list.createMany({
+            data: defaultLists.map((title, index) => ({
+                title,
+                userId: session.user.id,
+                boardId: board.id,
+                order: index,
+            })),
+        }),
+        prisma.label.createMany({
+            data: defaultLabels.map((label) => ({
+                ...label,
+                boardId: board.id,
+            })),
+        }),
+    ]);
 
     revalidatePath("/");
     return board;
@@ -70,36 +83,6 @@ export async function deleteBoard(id: string) {
     });
 
     revalidatePath("/");
-}
-
-// Resolve the caller's effective role on a board. Owner short-circuits to "OWNER".
-async function getBoardRole(boardId: string, userId: string): Promise<EffectiveRole | null> {
-    const board = await prisma.board.findUnique({
-        where: { id: boardId },
-        select: { userId: true },
-    });
-
-    if (!board) return null;
-    if (board.userId === userId) return "OWNER";
-
-    const membership = await prisma.boardMember.findFirst({
-        where: { boardId, userId },
-        select: { role: true },
-    });
-
-    return membership?.role ?? null;
-}
-
-// Read access: any owner or member.
-async function checkAccess(boardId: string, userId: string) {
-    return (await getBoardRole(boardId, userId)) !== null;
-}
-
-// Write access: owner or a non-viewer member. Throws if not permitted.
-async function requireWriteAccess(boardId: string, userId: string): Promise<EffectiveRole> {
-    const role = await getBoardRole(boardId, userId);
-    if (!role || role === "VIEWER") throw new Error("Forbidden");
-    return role;
 }
 
 export async function getBoard(boardId: string) {
@@ -129,6 +112,7 @@ export async function getBoardData(boardId: string): Promise<ListWithCards[] | n
         include: {
             cards: {
                 orderBy: { order: "asc" },
+                include: { labels: true },
             },
         },
     });
